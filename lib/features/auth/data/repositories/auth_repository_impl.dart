@@ -36,6 +36,24 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, UserEntity>> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final user = await _datasource.login(
+        email: email,
+        password: password,
+      );
+      return Right(user);
+    } on FirebaseAuthException catch (e) {
+      return Left(_mapFirebaseError(e.code));
+    } catch (e) {
+      return Left(AuthFailure(e.toString().replaceAll('Exception: ', '')));
+    }
+  }
+
+  @override
   Future<Either<Failure, GoogleAuthOutcome>> signInWithGoogle() async {
     try {
       final outcome = await _datasource.signInWithGoogle();

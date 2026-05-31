@@ -7,6 +7,7 @@ import 'package:foodbank/features/auth/data/repositories/auth_repository_impl.da
 import 'package:foodbank/features/auth/domain/repositories/auth_repository.dart';
 import 'package:foodbank/features/auth/domain/usecases/complete_profile_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/google_sign_in_usecase.dart';
+import 'package:foodbank/features/auth/domain/usecases/login_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/register_usecase.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 
@@ -35,6 +36,9 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<RegisterUsecase>(
     () => RegisterUsecase(sl<AuthRepository>()),
   );
+  sl.registerLazySingleton<LoginUsecase>(
+    () => LoginUsecase(sl<AuthRepository>()),
+  );
   sl.registerLazySingleton<GoogleSignInUsecase>(
     () => GoogleSignInUsecase(sl<AuthRepository>()),
   );
@@ -45,6 +49,7 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<AuthBloc>(
     () => AuthBloc(
       sl<RegisterUsecase>(),
+      sl<LoginUsecase>(),
       sl<GoogleSignInUsecase>(),
       sl<CompleteProfileUsecase>(),
     ),

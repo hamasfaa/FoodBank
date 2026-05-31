@@ -16,6 +16,13 @@ class AppStrings {
   static const String orDivider = 'atau';
   static const String continueWithGoogle = 'Lanjutkan dengan Google';
 
+  // Login page
+  static const String loginTitle = 'Selamat Datang Kembali';
+  static const String loginSubtitle = 'Masuk untuk melanjutkan aksi baikmu.';
+  static const String loginNow = 'Masuk Sekarang';
+  static const String dontHaveAccount = 'Belum punya akun?';
+  static const String errorInvalidCredentials = 'Email atau kata sandi salah';
+
   // Complete profile page
   static const String completeProfile = 'Lengkapi Profil';
   static const String completeProfileSubtitle =

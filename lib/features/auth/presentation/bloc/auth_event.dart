@@ -26,6 +26,19 @@ class RegisterSubmitted extends AuthEvent {
   List<Object?> get props => [fullName, email, phoneNumber, password, role];
 }
 
+class LoginSubmitted extends AuthEvent {
+  final String email;
+  final String password;
+
+  const LoginSubmitted({
+    required this.email,
+    required this.password,
+  });
+
+  @override
+  List<Object?> get props => [email, password];
+}
+
 class GoogleSignInRequested extends AuthEvent {
   const GoogleSignInRequested();
 }

@@ -15,6 +15,11 @@ abstract class AuthRemoteDatasource {
 
   Future<GoogleAuthOutcome> signInWithGoogle();
 
+  Future<UserModel> login({
+    required String email,
+    required String password,
+  });
+
   Future<UserModel> completeGoogleProfile({
     required String uid,
     required String fullName,
@@ -70,6 +75,37 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
       return userModel;
     } catch (e) {
       await firebaseUser.delete();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<UserModel> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final firebaseUser = credential.user!;
+      final doc = await _firestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
+
+      if (!doc.exists) {
+        await _auth.signOut();
+        throw Exception('Data pengguna tidak ditemukan');
+      }
+
+      return UserModel.fromFirestore(doc.data()!);
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        throw Exception('Email atau kata sandi salah');
+      }
       rethrow;
     }
   }

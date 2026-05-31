@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:foodbank/core/theme/app_theme.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/auth/presentation/pages/complete_profile_page.dart';
+import 'package:foodbank/features/auth/presentation/pages/login_page.dart';
 import 'package:foodbank/features/auth/presentation/pages/register_page.dart';
 import 'package:foodbank/firebase_options.dart';
 import 'package:foodbank/injection_container.dart';
@@ -30,8 +31,8 @@ class FoodBankApp extends StatelessWidget {
         routes: {
           '/register': (context) => const RegisterPage(),
           '/complete-profile': (context) => const CompleteProfilePage(),
+          '/login': (context) => const LoginPage(),
           // TODO:
-          // '/login': (context) => const LoginPage(),
           // '/donor-home': (context) => const DonorHomePage(),
           // '/recipient-home': (context) => const RecipientHomePage(),
         },

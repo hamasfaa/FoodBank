@@ -2,21 +2,25 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:foodbank/features/auth/domain/entities/google_auth_outcome.dart';
 import 'package:foodbank/features/auth/domain/usecases/complete_profile_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/google_sign_in_usecase.dart';
+import 'package:foodbank/features/auth/domain/usecases/login_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/register_usecase.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_event.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final RegisterUsecase _registerUsecase;
+  final LoginUsecase _loginUsecase;
   final GoogleSignInUsecase _googleSignInUsecase;
   final CompleteProfileUsecase _completeProfileUsecase;
 
   AuthBloc(
     this._registerUsecase,
+    this._loginUsecase,
     this._googleSignInUsecase,
     this._completeProfileUsecase,
   ) : super(const AuthState()) {
     on<RegisterSubmitted>(_onRegisterSubmitted);
+    on<LoginSubmitted>(_onLoginSubmitted);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<CompleteProfileSubmitted>(_onCompleteProfileSubmitted);
     on<RoleSelected>(_onRoleSelected);
@@ -37,6 +41,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         phoneNumber: event.phoneNumber,
         password: event.password,
         role: event.role,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: AuthStatus.failure,
+          errorMessage: failure.message,
+          clearUser: true,
+        ),
+      ),
+      (user) => emit(
+        state.copyWith(
+          status: AuthStatus.success,
+          user: user,
+          clearError: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onLoginSubmitted(
+    LoginSubmitted event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(state.copyWith(status: AuthStatus.loading, clearError: true));
+
+    final result = await _loginUsecase(
+      LoginParams(
+        email: event.email,
+        password: event.password,
       ),
     );
 

@@ -14,6 +14,11 @@ abstract class AuthRepository {
 
   Future<Either<Failure, GoogleAuthOutcome>> signInWithGoogle();
 
+  Future<Either<Failure, UserEntity>> login({
+    required String email,
+    required String password,
+  });
+
   Future<Either<Failure, UserEntity>> completeGoogleProfile({
     required String uid,
     required String fullName,
