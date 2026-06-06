@@ -103,9 +103,11 @@ class _LoginPageState extends State<LoginPage>
         } else if (state.status == AuthStatus.needsProfile) {
           Navigator.pushNamed(context, '/complete-profile');
         } else if (state.status == AuthStatus.success && state.user != null) {
-          final route = state.user!.role == 'donor'
-              ? '/donor-home'
-              : '/recipient-home';
+          final route = switch (state.user!.role) {
+            'donor' => '/donor-home',
+            'admin' => '/admin-users',
+            _ => '/recipient-home',
+          };
           Navigator.pushReplacementNamed(context, route);
         }
       },

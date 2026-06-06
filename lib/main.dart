@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:foodbank/core/theme/app_theme.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
@@ -9,11 +10,13 @@ import 'package:foodbank/features/auth/presentation/pages/register_page.dart';
 import 'package:foodbank/firebase_options.dart';
 import 'package:foodbank/injection_container.dart';
 import 'package:foodbank/admin_users_page.dart';
+import 'package:foodbank/features/food_post/presentation/pages/donor_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await configureDependencies();
+  await initializeDateFormatting('id_ID', null);
   runApp(const FoodBankApp());
 }
 
@@ -33,10 +36,8 @@ class FoodBankApp extends StatelessWidget {
           '/register': (context) => const RegisterPage(),
           '/complete-profile': (context) => const CompleteProfilePage(),
           '/login': (context) => const LoginPage(),
-          '/admin-users': (context) => const AdminUsersPage(), 
-          // TODO:
-          // '/donor-home': (context) => const DonorHomePage(),
-          // '/recipient-home': (context) => const RecipientHomePage(),
+          '/admin-users': (context) => const AdminUsersPage(),
+          '/donor-home': (context) => const DonorHomePage(),
         },
       ),
     );

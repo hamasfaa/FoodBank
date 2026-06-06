@@ -122,10 +122,7 @@ class _RegisterPageState extends State<RegisterPage>
         } else if (state.status == AuthStatus.needsProfile) {
           Navigator.pushNamed(context, '/complete-profile');
         } else if (state.status == AuthStatus.success && state.user != null) {
-          final route = state.user!.role == 'donor'
-              ? '/donor-home'
-              : '/recipient-home';
-          Navigator.pushReplacementNamed(context, route);
+          Navigator.pushReplacementNamed(context, '/login');
         }
       },
       child: Scaffold(
