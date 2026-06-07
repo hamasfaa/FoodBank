@@ -11,6 +11,9 @@ import 'package:foodbank/firebase_options.dart';
 import 'package:foodbank/injection_container.dart';
 import 'package:foodbank/admin_users_page.dart';
 import 'package:foodbank/features/food_post/presentation/pages/donor_home_page.dart';
+import 'package:foodbank/features/food_post/presentation/pages/receiver_home_page.dart';
+import 'package:foodbank/features/claim/presentation/pages/my_claims_page.dart';
+import 'package:foodbank/features/profile/presentation/pages/receiver_profile_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,13 +34,16 @@ class FoodBankApp extends StatelessWidget {
         title: 'FoodBridge',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        initialRoute: '/register', // initialRoute: '/admin-users',
+        initialRoute: '/login',
         routes: {
           '/register': (context) => const RegisterPage(),
           '/complete-profile': (context) => const CompleteProfilePage(),
           '/login': (context) => const LoginPage(),
           '/admin-users': (context) => const AdminUsersPage(),
           '/donor-home': (context) => const DonorHomePage(),
+          '/receiver-home': (context) => const ReceiverHomePage(),
+          '/my-claims': (context) => const MyClaimsPage(),
+          '/receiver-profile': (context) => const ReceiverProfilePage(),
         },
       ),
     );

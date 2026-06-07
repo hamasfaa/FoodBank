@@ -20,6 +20,8 @@ abstract class FoodPostRemoteDatasource {
   });
 
   Future<List<FoodPostEntity>> getMyFoodPosts(String donorId);
+
+  Future<List<FoodPostEntity>> getAvailableFoodPosts();
 }
 
 class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
@@ -70,6 +72,23 @@ class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
 
     await _firestore.collection('food_posts').doc(postId).set(model.toFirestore());
     return model;
+  }
+
+  @override
+  Future<List<FoodPostEntity>> getAvailableFoodPosts() async {
+    final now = DateTime.now();
+    final snapshot = await _firestore
+        .collection('food_posts')
+        .where('status', isEqualTo: 'available')
+        .get();
+
+    final posts = snapshot.docs
+        .map((doc) => FoodPostModel.fromFirestore(doc))
+        .where((post) => post.expiredAt.isAfter(now))
+        .toList();
+
+    posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return posts;
   }
 
   @override

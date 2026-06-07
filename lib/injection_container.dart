@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
 import 'package:foodbank/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:foodbank/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:foodbank/features/auth/domain/repositories/auth_repository.dart';
@@ -11,16 +12,33 @@ import 'package:foodbank/features/auth/domain/usecases/google_sign_in_usecase.da
 import 'package:foodbank/features/auth/domain/usecases/login_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/register_usecase.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
+
 import 'package:foodbank/features/food_post/data/datasources/food_post_remote_datasource.dart';
 import 'package:foodbank/features/food_post/data/repositories/food_post_repository_impl.dart';
 import 'package:foodbank/features/food_post/domain/repositories/food_post_repository.dart';
 import 'package:foodbank/features/food_post/domain/usecases/create_food_post_usecase.dart';
+import 'package:foodbank/features/food_post/domain/usecases/get_available_food_posts_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/get_my_food_posts_usecase.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
+
+import 'package:foodbank/features/claim/data/datasources/claim_remote_datasource.dart';
+import 'package:foodbank/features/claim/data/repositories/claim_repository_impl.dart';
+import 'package:foodbank/features/claim/domain/repositories/claim_repository.dart';
+import 'package:foodbank/features/claim/domain/usecases/cancel_claim_usecase.dart';
+import 'package:foodbank/features/claim/domain/usecases/create_claim_usecase.dart';
+import 'package:foodbank/features/claim/domain/usecases/get_my_claims_usecase.dart';
+import 'package:foodbank/features/claim/presentation/bloc/claim_bloc.dart';
+
+import 'package:foodbank/features/rating/data/datasources/rating_remote_datasource.dart';
+import 'package:foodbank/features/rating/data/repositories/rating_repository_impl.dart';
+import 'package:foodbank/features/rating/domain/repositories/rating_repository.dart';
+import 'package:foodbank/features/rating/domain/usecases/create_rating_usecase.dart';
+import 'package:foodbank/features/rating/presentation/bloc/rating_bloc.dart';
 
 final sl = GetIt.instance;
 
 Future<void> configureDependencies() async {
+  // Firebase
   sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   sl.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
   sl.registerLazySingleton<FirebaseStorage>(() => FirebaseStorage.instance);
@@ -34,24 +52,13 @@ Future<void> configureDependencies() async {
       googleSignIn: sl<GoogleSignIn>(),
     ),
   );
-
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(sl<AuthRemoteDatasource>()),
   );
-
-  sl.registerLazySingleton<RegisterUsecase>(
-    () => RegisterUsecase(sl<AuthRepository>()),
-  );
-  sl.registerLazySingleton<LoginUsecase>(
-    () => LoginUsecase(sl<AuthRepository>()),
-  );
-  sl.registerLazySingleton<GoogleSignInUsecase>(
-    () => GoogleSignInUsecase(sl<AuthRepository>()),
-  );
-  sl.registerLazySingleton<CompleteProfileUsecase>(
-    () => CompleteProfileUsecase(sl<AuthRepository>()),
-  );
-
+  sl.registerLazySingleton<RegisterUsecase>(() => RegisterUsecase(sl<AuthRepository>()));
+  sl.registerLazySingleton<LoginUsecase>(() => LoginUsecase(sl<AuthRepository>()));
+  sl.registerLazySingleton<GoogleSignInUsecase>(() => GoogleSignInUsecase(sl<AuthRepository>()));
+  sl.registerLazySingleton<CompleteProfileUsecase>(() => CompleteProfileUsecase(sl<AuthRepository>()));
   sl.registerLazySingleton<AuthBloc>(
     () => AuthBloc(
       sl<RegisterUsecase>(),
@@ -68,21 +75,61 @@ Future<void> configureDependencies() async {
       storage: sl<FirebaseStorage>(),
     ),
   );
-
   sl.registerLazySingleton<FoodPostRepository>(
     () => FoodPostRepositoryImpl(sl<FoodPostRemoteDatasource>()),
   );
-
   sl.registerLazySingleton<CreateFoodPostUsecase>(
     () => CreateFoodPostUsecase(sl<FoodPostRepository>()),
   );
-
   sl.registerLazySingleton<GetMyFoodPostsUsecase>(
     () => GetMyFoodPostsUsecase(sl<FoodPostRepository>()),
   );
-
+  sl.registerLazySingleton<GetAvailableFoodPostsUsecase>(
+    () => GetAvailableFoodPostsUsecase(sl<FoodPostRepository>()),
+  );
   sl.registerFactory<FoodPostBloc>(
-    () =>
-        FoodPostBloc(sl<CreateFoodPostUsecase>(), sl<GetMyFoodPostsUsecase>()),
+    () => FoodPostBloc(
+      sl<CreateFoodPostUsecase>(),
+      sl<GetMyFoodPostsUsecase>(),
+      sl<GetAvailableFoodPostsUsecase>(),
+    ),
+  );
+
+  // Claim feature
+  sl.registerLazySingleton<ClaimRemoteDatasource>(
+    () => ClaimRemoteDatasourceImpl(firestore: sl<FirebaseFirestore>()),
+  );
+  sl.registerLazySingleton<ClaimRepository>(
+    () => ClaimRepositoryImpl(sl<ClaimRemoteDatasource>()),
+  );
+  sl.registerLazySingleton<CreateClaimUsecase>(
+    () => CreateClaimUsecase(sl<ClaimRepository>()),
+  );
+  sl.registerLazySingleton<GetMyClaimsUsecase>(
+    () => GetMyClaimsUsecase(sl<ClaimRepository>()),
+  );
+  sl.registerLazySingleton<CancelClaimUsecase>(
+    () => CancelClaimUsecase(sl<ClaimRepository>()),
+  );
+  sl.registerFactory<ClaimBloc>(
+    () => ClaimBloc(
+      sl<CreateClaimUsecase>(),
+      sl<GetMyClaimsUsecase>(),
+      sl<CancelClaimUsecase>(),
+    ),
+  );
+
+  // Rating feature
+  sl.registerLazySingleton<RatingRemoteDatasource>(
+    () => RatingRemoteDatasourceImpl(firestore: sl<FirebaseFirestore>()),
+  );
+  sl.registerLazySingleton<RatingRepository>(
+    () => RatingRepositoryImpl(sl<RatingRemoteDatasource>()),
+  );
+  sl.registerLazySingleton<CreateRatingUsecase>(
+    () => CreateRatingUsecase(sl<RatingRepository>()),
+  );
+  sl.registerFactory<RatingBloc>(
+    () => RatingBloc(sl<CreateRatingUsecase>()),
   );
 }

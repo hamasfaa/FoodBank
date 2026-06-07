@@ -45,3 +45,7 @@ class LoadMyFoodPosts extends FoodPostEvent {
   @override
   List<Object?> get props => [donorId];
 }
+
+class LoadAvailableFoodPosts extends FoodPostEvent {
+  const LoadAvailableFoodPosts();
+}

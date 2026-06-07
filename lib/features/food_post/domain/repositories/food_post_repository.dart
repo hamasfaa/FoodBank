@@ -17,4 +17,6 @@ abstract class FoodPostRepository {
   });
 
   Future<Either<Failure, List<FoodPostEntity>>> getMyFoodPosts(String donorId);
+
+  Future<Either<Failure, List<FoodPostEntity>>> getAvailableFoodPosts();
 }

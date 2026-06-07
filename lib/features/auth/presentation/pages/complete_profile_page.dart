@@ -111,6 +111,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
           final route = switch (state.user!.role) {
             'donor' => '/donor-home',
             'admin' => '/admin-users',
+            'recipient' => '/receiver-home',
             _ => '/recipient-home',
           };
           Navigator.pushReplacementNamed(context, route);

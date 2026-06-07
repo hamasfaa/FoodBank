@@ -48,4 +48,14 @@ class FoodPostRepositoryImpl implements FoodPostRepository {
       return const Left(ServerFailure('Gagal memuat postingan, coba lagi'));
     }
   }
+
+  @override
+  Future<Either<Failure, List<FoodPostEntity>>> getAvailableFoodPosts() async {
+    try {
+      final posts = await _datasource.getAvailableFoodPosts();
+      return Right(posts);
+    } catch (e) {
+      return const Left(ServerFailure('Gagal memuat makanan tersedia, coba lagi'));
+    }
+  }
 }

@@ -106,7 +106,8 @@ class _LoginPageState extends State<LoginPage>
           final route = switch (state.user!.role) {
             'donor' => '/donor-home',
             'admin' => '/admin-users',
-            _ => '/recipient-home',
+            'receiver' => '/receiver-home',
+            _ => '/login',
           };
           Navigator.pushReplacementNamed(context, route);
         }
