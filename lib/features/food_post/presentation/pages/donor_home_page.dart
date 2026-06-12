@@ -10,6 +10,7 @@ import 'package:foodbank/features/food_post/presentation/bloc/food_post_event.da
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_state.dart';
 import 'package:foodbank/injection_container.dart';
 import 'create_food_post_page.dart';
+import 'edit_food_post_page.dart';
 
 class DonorHomePage extends StatelessWidget {
   const DonorHomePage({super.key});
@@ -39,6 +40,8 @@ class _DonorHomeView extends StatelessWidget {
       floatingActionButton: _buildFAB(context),
       body: BlocListener<FoodPostBloc, FoodPostState>(
         listener: (context, state) {
+          if (ModalRoute.of(context)?.isCurrent != true) return;
+
           if (state.status == FoodPostStatus.failure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -47,6 +50,21 @@ class _DonorHomeView extends StatelessWidget {
                   style: GoogleFonts.inter(),
                 ),
                 backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+          } else if (state.status == FoodPostStatus.success &&
+              state.successMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  state.successMessage!,
+                  style: GoogleFonts.inter(),
+                ),
+                backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -80,12 +98,150 @@ class _DonorHomeView extends StatelessWidget {
                 itemCount: state.myPosts.length,
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 12),
-                itemBuilder: (context, i) =>
-                    _FoodPostCard(post: state.myPosts[i]),
+                itemBuilder: (context, i) {
+                  final post = state.myPosts[i];
+                  return _FoodPostCard(
+                    post: post,
+                    onEdit: () => _openEditPost(context, post),
+                    onClose: () => _confirmClosePost(context, post),
+                    onDelete: () => _confirmDeletePost(context, post),
+                  );
+                },
               ),
             );
           },
         ),
+      ),
+    );
+  }
+
+  Future<void> _openEditPost(BuildContext context, FoodPostEntity post) async {
+    if (post.status != 'available') {
+      _showActionError(context, 'Hanya postingan tersedia yang bisa diedit');
+      return;
+    }
+
+    final bloc = context.read<FoodPostBloc>();
+    final authState = context.read<AuthBloc>().state;
+
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: bloc,
+          child: EditFoodPostPage(post: post),
+        ),
+      ),
+    );
+
+    if (result == true && context.mounted) {
+      bloc.add(LoadMyFoodPosts(authState.user?.uid ?? ''));
+    }
+  }
+
+  Future<void> _confirmClosePost(
+    BuildContext context,
+    FoodPostEntity post,
+  ) async {
+    if (post.status != 'available') {
+      _showActionError(context, 'Hanya postingan tersedia yang bisa ditutup');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Tutup Postingan?',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Postingan tidak akan muncul lagi untuk penerima. Klaim yang masih pending akan dibatalkan.',
+          style: GoogleFonts.inter(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('Batal', style: GoogleFonts.inter()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Tutup',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final authState = context.read<AuthBloc>().state;
+    context.read<FoodPostBloc>().add(
+      CloseFoodPostRequested(
+        postId: post.id,
+        donorId: authState.user?.uid ?? '',
+      ),
+    );
+  }
+
+  Future<void> _confirmDeletePost(
+    BuildContext context,
+    FoodPostEntity post,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          'Hapus Postingan?',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Postingan dan fotonya akan dihapus permanen. Aksi ini hanya berhasil kalau postingan belum memiliki klaim.',
+          style: GoogleFonts.inter(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('Batal', style: GoogleFonts.inter()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Hapus',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final authState = context.read<AuthBloc>().state;
+    context.read<FoodPostBloc>().add(
+      DeleteFoodPostRequested(
+        postId: post.id,
+        donorId: authState.user?.uid ?? '',
+      ),
+    );
+  }
+
+  void _showActionError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.inter()),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -235,8 +391,16 @@ class _DonorHomeView extends StatelessWidget {
 
 class _FoodPostCard extends StatelessWidget {
   final FoodPostEntity post;
+  final VoidCallback onEdit;
+  final VoidCallback onClose;
+  final VoidCallback onDelete;
 
-  const _FoodPostCard({required this.post});
+  const _FoodPostCard({
+    required this.post,
+    required this.onEdit,
+    required this.onClose,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -296,7 +460,14 @@ class _FoodPostCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 6),
                       _StatusBadge(status: post.status),
+                      _PostActionMenu(
+                        post: post,
+                        onEdit: onEdit,
+                        onClose: onClose,
+                        onDelete: onDelete,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -337,6 +508,94 @@ class _FoodPostCard extends StatelessWidget {
   }
 }
 
+enum _FoodPostAction { edit, close, delete }
+
+class _PostActionMenu extends StatelessWidget {
+  final FoodPostEntity post;
+  final VoidCallback onEdit;
+  final VoidCallback onClose;
+  final VoidCallback onDelete;
+
+  const _PostActionMenu({
+    required this.post,
+    required this.onEdit,
+    required this.onClose,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canChange = post.status == 'available';
+
+    return PopupMenuButton<_FoodPostAction>(
+      tooltip: 'Aksi postingan',
+      icon: const Icon(
+        Icons.more_vert,
+        size: 20,
+        color: AppColors.textSecondary,
+      ),
+      padding: EdgeInsets.zero,
+      onSelected: (action) {
+        switch (action) {
+          case _FoodPostAction.edit:
+            onEdit();
+            break;
+          case _FoodPostAction.close:
+            onClose();
+            break;
+          case _FoodPostAction.delete:
+            onDelete();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (canChange)
+          PopupMenuItem(
+            value: _FoodPostAction.edit,
+            child: _ActionMenuItem(icon: Icons.edit_outlined, label: 'Edit'),
+          ),
+        if (canChange)
+          PopupMenuItem(
+            value: _FoodPostAction.close,
+            child: _ActionMenuItem(
+              icon: Icons.visibility_off_outlined,
+              label: 'Tutup',
+            ),
+          ),
+        PopupMenuItem(
+          value: _FoodPostAction.delete,
+          child: _ActionMenuItem(
+            icon: Icons.delete_outline,
+            label: 'Hapus',
+            color: AppColors.error,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const _ActionMenuItem({required this.icon, required this.label, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final itemColor = color ?? AppColors.textPrimary;
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: itemColor),
+        const SizedBox(width: 10),
+        Text(label, style: GoogleFonts.inter(fontSize: 14, color: itemColor)),
+      ],
+    );
+  }
+}
+
 class _StatusBadge extends StatelessWidget {
   final String status;
 
@@ -346,7 +605,9 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
       'available' => (AppColors.success, 'Tersedia'),
+      'claimed' => (const Color(0xFFF59E0B), 'Diklaim'),
       'reserved' => (const Color(0xFFF59E0B), 'Dipesan'),
+      'closed' => (AppColors.textSecondary, 'Ditutup'),
       'taken' => (AppColors.textSecondary, 'Diambil'),
       'expired' => (AppColors.error, 'Kadaluarsa'),
       _ => (AppColors.textSecondary, status),

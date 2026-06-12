@@ -16,9 +16,12 @@ import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/food_post/data/datasources/food_post_remote_datasource.dart';
 import 'package:foodbank/features/food_post/data/repositories/food_post_repository_impl.dart';
 import 'package:foodbank/features/food_post/domain/repositories/food_post_repository.dart';
+import 'package:foodbank/features/food_post/domain/usecases/close_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/create_food_post_usecase.dart';
+import 'package:foodbank/features/food_post/domain/usecases/delete_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/get_available_food_posts_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/get_my_food_posts_usecase.dart';
+import 'package:foodbank/features/food_post/domain/usecases/update_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
 
 import 'package:foodbank/features/claim/data/datasources/claim_remote_datasource.dart';
@@ -55,10 +58,18 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(sl<AuthRemoteDatasource>()),
   );
-  sl.registerLazySingleton<RegisterUsecase>(() => RegisterUsecase(sl<AuthRepository>()));
-  sl.registerLazySingleton<LoginUsecase>(() => LoginUsecase(sl<AuthRepository>()));
-  sl.registerLazySingleton<GoogleSignInUsecase>(() => GoogleSignInUsecase(sl<AuthRepository>()));
-  sl.registerLazySingleton<CompleteProfileUsecase>(() => CompleteProfileUsecase(sl<AuthRepository>()));
+  sl.registerLazySingleton<RegisterUsecase>(
+    () => RegisterUsecase(sl<AuthRepository>()),
+  );
+  sl.registerLazySingleton<LoginUsecase>(
+    () => LoginUsecase(sl<AuthRepository>()),
+  );
+  sl.registerLazySingleton<GoogleSignInUsecase>(
+    () => GoogleSignInUsecase(sl<AuthRepository>()),
+  );
+  sl.registerLazySingleton<CompleteProfileUsecase>(
+    () => CompleteProfileUsecase(sl<AuthRepository>()),
+  );
   sl.registerLazySingleton<AuthBloc>(
     () => AuthBloc(
       sl<RegisterUsecase>(),
@@ -87,11 +98,23 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<GetAvailableFoodPostsUsecase>(
     () => GetAvailableFoodPostsUsecase(sl<FoodPostRepository>()),
   );
+  sl.registerLazySingleton<UpdateFoodPostUsecase>(
+    () => UpdateFoodPostUsecase(sl<FoodPostRepository>()),
+  );
+  sl.registerLazySingleton<CloseFoodPostUsecase>(
+    () => CloseFoodPostUsecase(sl<FoodPostRepository>()),
+  );
+  sl.registerLazySingleton<DeleteFoodPostUsecase>(
+    () => DeleteFoodPostUsecase(sl<FoodPostRepository>()),
+  );
   sl.registerFactory<FoodPostBloc>(
     () => FoodPostBloc(
       sl<CreateFoodPostUsecase>(),
       sl<GetMyFoodPostsUsecase>(),
       sl<GetAvailableFoodPostsUsecase>(),
+      sl<UpdateFoodPostUsecase>(),
+      sl<CloseFoodPostUsecase>(),
+      sl<DeleteFoodPostUsecase>(),
     ),
   );
 
@@ -129,7 +152,5 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<CreateRatingUsecase>(
     () => CreateRatingUsecase(sl<RatingRepository>()),
   );
-  sl.registerFactory<RatingBloc>(
-    () => RatingBloc(sl<CreateRatingUsecase>()),
-  );
+  sl.registerFactory<RatingBloc>(() => RatingBloc(sl<CreateRatingUsecase>()));
 }

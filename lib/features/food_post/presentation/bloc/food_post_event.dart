@@ -32,9 +32,72 @@ class CreateFoodPostSubmitted extends FoodPostEvent {
 
   @override
   List<Object?> get props => [
-        donorId, donorName, title, description,
-        quantity, expiredAt, location, images,
-      ];
+    donorId,
+    donorName,
+    title,
+    description,
+    quantity,
+    expiredAt,
+    location,
+    images,
+  ];
+}
+
+class UpdateFoodPostSubmitted extends FoodPostEvent {
+  final String postId;
+  final String donorId;
+  final String title;
+  final String description;
+  final double quantity;
+  final DateTime expiredAt;
+  final FoodLocationEntity location;
+  final List<String> existingImageUrls;
+  final List<File> newImages;
+
+  const UpdateFoodPostSubmitted({
+    required this.postId,
+    required this.donorId,
+    required this.title,
+    required this.description,
+    required this.quantity,
+    required this.expiredAt,
+    required this.location,
+    required this.existingImageUrls,
+    required this.newImages,
+  });
+
+  @override
+  List<Object?> get props => [
+    postId,
+    donorId,
+    title,
+    description,
+    quantity,
+    expiredAt,
+    location,
+    existingImageUrls,
+    newImages,
+  ];
+}
+
+class CloseFoodPostRequested extends FoodPostEvent {
+  final String postId;
+  final String donorId;
+
+  const CloseFoodPostRequested({required this.postId, required this.donorId});
+
+  @override
+  List<Object?> get props => [postId, donorId];
+}
+
+class DeleteFoodPostRequested extends FoodPostEvent {
+  final String postId;
+  final String donorId;
+
+  const DeleteFoodPostRequested({required this.postId, required this.donorId});
+
+  @override
+  List<Object?> get props => [postId, donorId];
 }
 
 class LoadMyFoodPosts extends FoodPostEvent {

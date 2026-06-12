@@ -16,6 +16,28 @@ abstract class FoodPostRepository {
     required List<File> images,
   });
 
+  Future<Either<Failure, FoodPostEntity>> updateFoodPost({
+    required String postId,
+    required String donorId,
+    required String title,
+    required String description,
+    required double quantity,
+    required DateTime expiredAt,
+    required FoodLocationEntity location,
+    required List<String> existingImageUrls,
+    required List<File> newImages,
+  });
+
+  Future<Either<Failure, FoodPostEntity>> closeFoodPost({
+    required String postId,
+    required String donorId,
+  });
+
+  Future<Either<Failure, void>> deleteFoodPost({
+    required String postId,
+    required String donorId,
+  });
+
   Future<Either<Failure, List<FoodPostEntity>>> getMyFoodPosts(String donorId);
 
   Future<Either<Failure, List<FoodPostEntity>>> getAvailableFoodPosts();

@@ -8,13 +8,16 @@ import 'package:intl/intl.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/food_post/domain/entities/food_location_entity.dart';
+import 'package:foodbank/features/food_post/domain/entities/food_post_entity.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_event.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_state.dart';
 import 'location_picker_page.dart';
 
 class CreateFoodPostPage extends StatefulWidget {
-  const CreateFoodPostPage({super.key});
+  final FoodPostEntity? initialPost;
+
+  const CreateFoodPostPage({super.key, this.initialPost});
 
   @override
   State<CreateFoodPostPage> createState() => _CreateFoodPostPageState();
@@ -31,12 +34,31 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
   final _quantityFocus = FocusNode();
 
   final List<File> _selectedImages = [];
+  final List<String> _existingImageUrls = [];
   static const int _maxImages = 5;
   DateTime? _expiredAt;
   FoodLocationEntity? _selectedLocation;
   bool _autoValidate = false;
 
   final _imagePicker = ImagePicker();
+
+  bool get _isEditing => widget.initialPost != null;
+  int get _currentImageCount =>
+      _existingImageUrls.length + _selectedImages.length;
+
+  @override
+  void initState() {
+    super.initState();
+    final post = widget.initialPost;
+    if (post == null) return;
+
+    _titleController.text = post.title;
+    _descriptionController.text = post.description;
+    _quantityController.text = post.quantity.toStringAsFixed(0);
+    _expiredAt = post.expiredAt;
+    _selectedLocation = post.location;
+    _existingImageUrls.addAll(post.imageUrls.take(_maxImages));
+  }
 
   @override
   void dispose() {
@@ -57,7 +79,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
         imageQuality: 75,
         maxWidth: 1024,
       );
-      if (picked != null && _selectedImages.length < _maxImages) {
+      if (picked != null && _currentImageCount < _maxImages) {
         setState(() => _selectedImages.add(File(picked.path)));
       }
     } catch (e) {
@@ -68,7 +90,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
   Future<void> _pickFromGallery() async {
     Navigator.of(context).pop();
     try {
-      final remaining = _maxImages - _selectedImages.length;
+      final remaining = _maxImages - _currentImageCount;
       final picked = await _imagePicker.pickMultiImage(
         imageQuality: 75,
         maxWidth: 1024,
@@ -77,7 +99,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
       if (picked.isNotEmpty) {
         setState(() {
           for (final xfile in picked) {
-            if (_selectedImages.length < _maxImages) {
+            if (_currentImageCount < _maxImages) {
               _selectedImages.add(File(xfile.path));
             }
           }
@@ -90,6 +112,10 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
 
   void _removeImage(int index) {
     setState(() => _selectedImages.removeAt(index));
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() => _existingImageUrls.removeAt(index));
   }
 
   void _showImageSourceSheet() {
@@ -122,7 +148,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${_selectedImages.length}/$_maxImages foto dipilih',
+              '$_currentImageCount/$_maxImages foto dipilih',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -154,9 +180,12 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final initialDate = _expiredAt != null && !_expiredAt!.isBefore(now)
+        ? _expiredAt!
+        : now.add(const Duration(days: 3));
     final picked = await showDatePicker(
       context: context,
-      initialDate: _expiredAt ?? now.add(const Duration(days: 3)),
+      initialDate: initialDate,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       builder: (context, child) => Theme(
@@ -180,7 +209,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
     setState(() => _autoValidate = true);
 
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedImages.isEmpty) {
+    if (_currentImageCount == 0) {
       _showError('Pilih minimal 1 foto makanan');
       return;
     }
@@ -196,6 +225,24 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
     final authState = context.read<AuthBloc>().state;
     final user = authState.user;
     if (user == null) return;
+
+    final post = widget.initialPost;
+    if (_isEditing && post != null) {
+      context.read<FoodPostBloc>().add(
+        UpdateFoodPostSubmitted(
+          postId: post.id,
+          donorId: user.uid,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          quantity: double.parse(_quantityController.text.trim()),
+          expiredAt: _expiredAt!,
+          location: _selectedLocation!,
+          existingImageUrls: _existingImageUrls,
+          newImages: _selectedImages,
+        ),
+      );
+      return;
+    }
 
     context.read<FoodPostBloc>().add(
       CreateFoodPostSubmitted(
@@ -232,7 +279,10 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Postingan berhasil dibuat!',
+                state.successMessage ??
+                    (_isEditing
+                        ? 'Postingan berhasil diperbarui!'
+                        : 'Postingan berhasil dibuat!'),
                 style: GoogleFonts.inter(),
               ),
               backgroundColor: AppColors.success,
@@ -262,7 +312,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text(
-        'Buat Postingan Donasi',
+        _isEditing ? 'Edit Postingan Donasi' : 'Buat Postingan Donasi',
         style: GoogleFonts.poppins(
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -297,8 +347,9 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
                   nextFocus: _descFocus,
                   hint: 'Cth: Nasi Putih Sisa Katering',
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty)
+                    if (v == null || v.trim().isEmpty) {
                       return 'Judul wajib diisi';
+                    }
                     if (v.trim().length < 5) return 'Judul minimal 5 karakter';
                     return null;
                   },
@@ -312,10 +363,12 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
                   hint: 'Ceritakan kondisi makanan, porsi, dll.',
                   maxLines: 3,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty)
+                    if (v == null || v.trim().isEmpty) {
                       return 'Deskripsi wajib diisi';
-                    if (v.trim().length < 10)
+                    }
+                    if (v.trim().length < 10) {
                       return 'Deskripsi minimal 10 karakter';
+                    }
                     return null;
                   },
                 ),
@@ -329,11 +382,13 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty)
+                    if (v == null || v.trim().isEmpty) {
                       return 'Kuantitas wajib diisi';
+                    }
                     final val = double.tryParse(v.trim());
-                    if (val == null || val <= 0)
+                    if (val == null || val <= 0) {
                       return 'Masukkan nilai yang valid';
+                    }
                     return null;
                   },
                 ),
@@ -369,7 +424,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
                             ),
                           )
                         : Text(
-                            'Posting Donasi',
+                            _isEditing ? 'Simpan Perubahan' : 'Posting Donasi',
                             style: GoogleFonts.poppins(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -402,7 +457,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
             ),
             const SizedBox(width: 6),
             Text(
-              '${_selectedImages.length}/$_maxImages',
+              '$_currentImageCount/$_maxImages',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -416,10 +471,18 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              ..._selectedImages.asMap().entries.map(
-                (entry) => _buildImageThumb(entry.value, entry.key),
+              ..._existingImageUrls.asMap().entries.map(
+                (entry) =>
+                    _buildExistingImageThumb(entry.value, entry.key, entry.key),
               ),
-              if (_selectedImages.length < _maxImages) _buildAddImageButton(),
+              ..._selectedImages.asMap().entries.map(
+                (entry) => _buildImageThumb(
+                  entry.value,
+                  entry.key,
+                  _existingImageUrls.length + entry.key,
+                ),
+              ),
+              if (_currentImageCount < _maxImages) _buildAddImageButton(),
             ],
           ),
         ),
@@ -427,7 +490,50 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
     );
   }
 
-  Widget _buildImageThumb(File file, int index) {
+  Widget _buildExistingImageThumb(
+    String imageUrl,
+    int index,
+    int displayIndex,
+  ) {
+    return Container(
+      width: 110,
+      height: 110,
+      margin: const EdgeInsets.only(right: 8),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              imageUrl,
+              width: 110,
+              height: 110,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 110,
+                height: 110,
+                color: AppColors.border,
+                child: const Icon(
+                  Icons.broken_image_outlined,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          if (displayIndex == 0) _buildPrimaryBadge(),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: () => _removeExistingImage(index),
+              child: _buildRemoveButton(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageThumb(File file, int index, int displayIndex) {
     return Container(
       width: 110,
       height: 110,
@@ -438,44 +544,51 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
             borderRadius: BorderRadius.circular(12),
             child: Image.file(file, width: 110, height: 110, fit: BoxFit.cover),
           ),
-          if (index == 0)
-            Positioned(
-              left: 6,
-              bottom: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Utama',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
+          if (displayIndex == 0) _buildPrimaryBadge(),
           Positioned(
             top: 4,
             right: 4,
             child: GestureDetector(
               onTap: () => _removeImage(index),
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, size: 14, color: Colors.white),
-              ),
+              child: _buildRemoveButton(),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPrimaryBadge() {
+    return Positioned(
+      left: 6,
+      bottom: 6,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Utama',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemoveButton() {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: const BoxDecoration(
+        color: Colors.black54,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.close, size: 14, color: Colors.white),
     );
   }
 
