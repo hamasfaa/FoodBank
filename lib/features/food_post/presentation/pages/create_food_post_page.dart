@@ -9,9 +9,12 @@ import 'package:foodbank/core/constants/app_colors.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/food_post/domain/entities/food_location_entity.dart';
 import 'package:foodbank/features/food_post/domain/entities/food_post_entity.dart';
+import 'package:foodbank/features/food_post/domain/entities/food_recognition_suggestion.dart';
+import 'package:foodbank/features/food_post/domain/usecases/recognize_food_image_usecase.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_event.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_state.dart';
+import 'package:foodbank/injection_container.dart';
 import 'location_picker_page.dart';
 
 class CreateFoodPostPage extends StatefulWidget {
@@ -39,8 +42,10 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
   DateTime? _expiredAt;
   FoodLocationEntity? _selectedLocation;
   bool _autoValidate = false;
+  bool _isRecognizingFood = false;
 
   final _imagePicker = ImagePicker();
+  late final RecognizeFoodImageUsecase _recognizeFoodImage;
 
   bool get _isEditing => widget.initialPost != null;
   int get _currentImageCount =>
@@ -49,6 +54,7 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
   @override
   void initState() {
     super.initState();
+    _recognizeFoodImage = sl<RecognizeFoodImageUsecase>();
     final post = widget.initialPost;
     if (post == null) return;
 
@@ -205,6 +211,55 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
     if (result != null) setState(() => _selectedLocation = result);
   }
 
+  Future<void> _analyzeFoodImage() async {
+    if (_selectedImages.isEmpty) {
+      _showError('Tambahkan foto baru terlebih dahulu untuk dianalisis AI');
+      return;
+    }
+
+    setState(() => _isRecognizingFood = true);
+    final result = await _recognizeFoodImage(_selectedImages.first);
+    if (!mounted) return;
+
+    result.fold((failure) => _showError(failure.message), (suggestion) {
+      _applyRecognitionSuggestion(suggestion);
+      final candidate = suggestion.bestCandidate;
+      final confidence = candidate.confidence;
+      final suffix = confidence == null
+          ? ''
+          : ' (${(confidence * 100).clamp(0, 100).toStringAsFixed(0)}%)';
+      _showSuccess('AI mendeteksi: ${_titleCase(candidate.name)}$suffix');
+    });
+
+    if (mounted) setState(() => _isRecognizingFood = false);
+  }
+
+  void _applyRecognitionSuggestion(FoodRecognitionSuggestion suggestion) {
+    final foodName = _titleCase(suggestion.bestCandidate.name);
+    final ingredients = suggestion.ingredients.map(_titleCase).join(', ');
+    final category = suggestion.category == null
+        ? null
+        : _titleCase(suggestion.category!);
+
+    setState(() {
+      _titleController.text =
+          suggestion.suggestedTitle?.trim().isNotEmpty == true
+          ? suggestion.suggestedTitle!.trim()
+          : 'Donasi $foodName';
+      _descriptionController.text =
+          suggestion.suggestedDescription?.trim().isNotEmpty == true
+          ? suggestion.suggestedDescription!.trim()
+          : [
+              '$foodName siap untuk didonasikan.',
+              if (category != null) 'Kategori: $category.',
+              if (ingredients.isNotEmpty) 'Bahan terdeteksi: $ingredients.',
+              if (suggestion.estimatedCalories != null)
+                'Estimasi kalori: ${suggestion.estimatedCalories}.',
+              'Mohon penerima mengambil sesuai jadwal dan cek kembali kondisi makanan saat pickup.',
+            ].join(' ');
+    });
+  }
+
   void _submit() {
     setState(() => _autoValidate = true);
 
@@ -267,6 +322,29 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.inter()),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  String _titleCase(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .map((word) {
+          if (word.length == 1) return word.toUpperCase();
+          return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+        })
+        .join(' ');
   }
 
   @override
@@ -338,6 +416,8 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildImagePicker(),
+                const SizedBox(height: 12),
+                _buildAiAssistButton(),
                 const SizedBox(height: 20),
                 _buildLabel('Judul Makanan'),
                 const SizedBox(height: 6),
@@ -487,6 +567,45 @@ class _CreateFoodPostPageState extends State<CreateFoodPostPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAiAssistButton() {
+    final hasNewImage = _selectedImages.isNotEmpty;
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _isRecognizingFood || !hasNewImage
+            ? null
+            : _analyzeFoodImage,
+        icon: _isRecognizingFood
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              )
+            : const Icon(Icons.auto_awesome_outlined, size: 18),
+        label: Text(
+          _isRecognizingFood
+              ? 'Mendeteksi makanan...'
+              : 'Deteksi Makanan dengan AI',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(
+            color: hasNewImage ? AppColors.primary : AppColors.border,
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
     );
   }
 

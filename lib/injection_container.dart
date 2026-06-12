@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:foodbank/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:foodbank/features/auth/data/repositories/auth_repository_impl.dart';
@@ -13,14 +14,19 @@ import 'package:foodbank/features/auth/domain/usecases/login_usecase.dart';
 import 'package:foodbank/features/auth/domain/usecases/register_usecase.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 
+import 'package:foodbank/features/food_post/data/datasources/gemini_food_recognition_remote_datasource.dart';
+import 'package:foodbank/features/food_post/data/datasources/food_recognition_remote_datasource.dart';
 import 'package:foodbank/features/food_post/data/datasources/food_post_remote_datasource.dart';
+import 'package:foodbank/features/food_post/data/repositories/food_recognition_repository_impl.dart';
 import 'package:foodbank/features/food_post/data/repositories/food_post_repository_impl.dart';
+import 'package:foodbank/features/food_post/domain/repositories/food_recognition_repository.dart';
 import 'package:foodbank/features/food_post/domain/repositories/food_post_repository.dart';
 import 'package:foodbank/features/food_post/domain/usecases/close_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/create_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/delete_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/get_available_food_posts_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/get_my_food_posts_usecase.dart';
+import 'package:foodbank/features/food_post/domain/usecases/recognize_food_image_usecase.dart';
 import 'package:foodbank/features/food_post/domain/usecases/update_food_post_usecase.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
 
@@ -46,6 +52,7 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
   sl.registerLazySingleton<FirebaseStorage>(() => FirebaseStorage.instance);
   sl.registerLazySingleton<GoogleSignIn>(() => GoogleSignIn());
+  sl.registerLazySingleton<http.Client>(() => http.Client());
 
   // Auth feature
   sl.registerLazySingleton<AuthRemoteDatasource>(
@@ -86,8 +93,14 @@ Future<void> configureDependencies() async {
       storage: sl<FirebaseStorage>(),
     ),
   );
+  sl.registerLazySingleton<FoodRecognitionRemoteDatasource>(
+    () => GeminiFoodRecognitionRemoteDatasourceImpl(client: sl<http.Client>()),
+  );
   sl.registerLazySingleton<FoodPostRepository>(
     () => FoodPostRepositoryImpl(sl<FoodPostRemoteDatasource>()),
+  );
+  sl.registerLazySingleton<FoodRecognitionRepository>(
+    () => FoodRecognitionRepositoryImpl(sl<FoodRecognitionRemoteDatasource>()),
   );
   sl.registerLazySingleton<CreateFoodPostUsecase>(
     () => CreateFoodPostUsecase(sl<FoodPostRepository>()),
@@ -106,6 +119,9 @@ Future<void> configureDependencies() async {
   );
   sl.registerLazySingleton<DeleteFoodPostUsecase>(
     () => DeleteFoodPostUsecase(sl<FoodPostRepository>()),
+  );
+  sl.registerLazySingleton<RecognizeFoodImageUsecase>(
+    () => RecognizeFoodImageUsecase(sl<FoodRecognitionRepository>()),
   );
   sl.registerFactory<FoodPostBloc>(
     () => FoodPostBloc(
