@@ -12,6 +12,8 @@ import 'package:foodbank/injection_container.dart';
 import 'create_food_post_page.dart';
 import 'edit_food_post_page.dart';
 
+enum _DonorPostFilter { all, available, claimed, closed, expired }
+
 class DonorHomePage extends StatelessWidget {
   const DonorHomePage({super.key});
 
@@ -27,10 +29,51 @@ class DonorHomePage extends StatelessWidget {
   }
 }
 
-class _DonorHomeView extends StatelessWidget {
+class _DonorHomeView extends StatefulWidget {
   final String userName;
 
   const _DonorHomeView({required this.userName});
+
+  @override
+  State<_DonorHomeView> createState() => _DonorHomeViewState();
+}
+
+class _DonorHomeViewState extends State<_DonorHomeView> {
+  final _searchController = TextEditingController();
+  String _query = '';
+  _DonorPostFilter _filter = _DonorPostFilter.all;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<FoodPostEntity> _filteredPosts(List<FoodPostEntity> posts) {
+    final q = _query.trim().toLowerCase();
+    return posts.where((post) {
+      final matchesQuery =
+          q.isEmpty ||
+          post.title.toLowerCase().contains(q) ||
+          post.description.toLowerCase().contains(q) ||
+          post.location.address.toLowerCase().contains(q) ||
+          _statusLabel(post.status).toLowerCase().contains(q);
+
+      final matchesFilter = switch (_filter) {
+        _DonorPostFilter.all => true,
+        _DonorPostFilter.available => post.status == 'available',
+        _DonorPostFilter.closed => post.status == 'closed',
+        _DonorPostFilter.expired => post.status == 'expired',
+        _DonorPostFilter.claimed =>
+          post.status == 'claimed' || post.status == 'reserved',
+      };
+
+      return matchesQuery && matchesFilter;
+    }).toList();
+  }
+
+  bool get _hasActiveSearchOrFilter =>
+      _query.trim().isNotEmpty || _filter != _DonorPostFilter.all;
 
   @override
   Widget build(BuildContext context) {
@@ -81,38 +124,270 @@ class _DonorHomeView extends StatelessWidget {
               );
             }
 
+            final posts = _filteredPosts(state.myPosts);
+
             if (state.myPosts.isEmpty) {
               return _buildEmptyState(context);
             }
 
-            return RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async {
-                final authState = context.read<AuthBloc>().state;
-                context.read<FoodPostBloc>().add(
-                  LoadMyFoodPosts(authState.user?.uid ?? ''),
-                );
-              },
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                itemCount: state.myPosts.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
-                itemBuilder: (context, i) {
-                  final post = state.myPosts[i];
-                  return _FoodPostCard(
-                    post: post,
-                    onEdit: () => _openEditPost(context, post),
-                    onClose: () => _confirmClosePost(context, post),
-                    onDelete: () => _confirmDeletePost(context, post),
-                  );
-                },
-              ),
+            return Column(
+              children: [
+                _buildSearchAndFilters(),
+                Expanded(
+                  child: posts.isEmpty
+                      ? _buildNoResultsState()
+                      : RefreshIndicator(
+                          color: AppColors.primary,
+                          onRefresh: () async {
+                            final authState = context.read<AuthBloc>().state;
+                            context.read<FoodPostBloc>().add(
+                              LoadMyFoodPosts(authState.user?.uid ?? ''),
+                            );
+                          },
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                            itemCount: posts.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) {
+                              final post = posts[i];
+                              return _FoodPostCard(
+                                post: post,
+                                onEdit: () => _openEditPost(context, post),
+                                onClose: () => _confirmClosePost(context, post),
+                                onDelete: () =>
+                                    _confirmDeletePost(context, post),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
             );
           },
         ),
       ),
     );
+  }
+
+  Widget _buildSearchAndFilters() {
+    return Container(
+      color: AppColors.background,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            onChanged: (value) => setState(() => _query = value),
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Cari postingan, lokasi, status...',
+              hintStyle: GoogleFonts.inter(color: AppColors.textSecondary),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+              suffixIcon: _query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.clear,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppColors.surface,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _DonorPostFilter.values.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final filter = _DonorPostFilter.values[index];
+                return _buildFilterChip(filter);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(_DonorPostFilter filter) {
+    final selected = filter == _filter;
+    final foreground = selected ? Colors.white : AppColors.textPrimary;
+    final iconColor = selected ? Colors.white : _filterColor(filter);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => setState(() => _filter = filter),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: Icon(_filterIcon(filter), size: 18, color: iconColor),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _filterLabel(filter),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Tidak Ada Hasil',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Coba kata kunci atau filter status lain.',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (_hasActiveSearchOrFilter) ...[
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() {
+                    _query = '';
+                    _filter = _DonorPostFilter.all;
+                  });
+                },
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(
+                  'Reset Filter',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _filterLabel(_DonorPostFilter filter) {
+    return switch (filter) {
+      _DonorPostFilter.all => 'Semua',
+      _DonorPostFilter.available => 'Tersedia',
+      _DonorPostFilter.claimed => 'Diklaim',
+      _DonorPostFilter.closed => 'Ditutup',
+      _DonorPostFilter.expired => 'Kadaluarsa',
+    };
+  }
+
+  IconData _filterIcon(_DonorPostFilter filter) {
+    return switch (filter) {
+      _DonorPostFilter.all => Icons.tune_outlined,
+      _DonorPostFilter.available => Icons.check_circle_outline,
+      _DonorPostFilter.claimed => Icons.receipt_long_outlined,
+      _DonorPostFilter.closed => Icons.visibility_off_outlined,
+      _DonorPostFilter.expired => Icons.event_busy_outlined,
+    };
+  }
+
+  Color _filterColor(_DonorPostFilter filter) {
+    return switch (filter) {
+      _DonorPostFilter.all => AppColors.textSecondary,
+      _DonorPostFilter.available => AppColors.success,
+      _DonorPostFilter.claimed => const Color(0xFFF59E0B),
+      _DonorPostFilter.closed => AppColors.textSecondary,
+      _DonorPostFilter.expired => AppColors.error,
+    };
+  }
+
+  String _statusLabel(String status) {
+    return switch (status) {
+      'available' => 'Tersedia',
+      'claimed' => 'Diklaim',
+      'reserved' => 'Dipesan',
+      'closed' => 'Ditutup',
+      'taken' => 'Diambil',
+      'expired' => 'Kadaluarsa',
+      _ => status,
+    };
   }
 
   Future<void> _openEditPost(BuildContext context, FoodPostEntity post) async {
@@ -255,7 +530,7 @@ class _DonorHomeView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Halo, $userName',
+            'Halo, ${widget.userName}',
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
