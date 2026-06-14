@@ -15,5 +15,17 @@ abstract class ClaimRepository {
 
   Future<Either<Failure, List<ClaimEntity>>> getMyClaims(String receiverId);
 
+  Future<Either<Failure, List<ClaimEntity>>> getIncomingClaims(String donorId);
+
   Future<Either<Failure, void>> cancelClaim(String claimId);
+
+  Future<Either<Failure, void>> confirmClaim({
+    required String claimId,
+    required String donorId,
+  });
+
+  Future<Either<Failure, void>> rejectClaim({
+    required String claimId,
+    required String donorId,
+  });
 }

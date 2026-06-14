@@ -29,10 +29,40 @@ class ClaimEntity extends Equatable {
     this.isVerifiedByAdmin = false,
   });
 
+  ClaimEntity copyWith({
+    String? status,
+    DateTime? confirmedAt,
+    bool? isVerifiedByAdmin,
+  }) {
+    return ClaimEntity(
+      id: id,
+      foodId: foodId,
+      foodTitle: foodTitle,
+      foodImageUrl: foodImageUrl,
+      donorId: donorId,
+      donorName: donorName,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      status: status ?? this.status,
+      claimedAt: claimedAt,
+      confirmedAt: confirmedAt ?? this.confirmedAt,
+      isVerifiedByAdmin: isVerifiedByAdmin ?? this.isVerifiedByAdmin,
+    );
+  }
+
   @override
   List<Object?> get props => [
-        id, foodId, foodTitle, foodImageUrl,
-        donorId, donorName, receiverId, receiverName,
-        status, claimedAt, confirmedAt, isVerifiedByAdmin,
-      ];
+    id,
+    foodId,
+    foodTitle,
+    foodImageUrl,
+    donorId,
+    donorName,
+    receiverId,
+    receiverName,
+    status,
+    claimedAt,
+    confirmedAt,
+    isVerifiedByAdmin,
+  ];
 }

@@ -16,14 +16,20 @@ abstract class ClaimRemoteDatasource {
 
   Future<List<ClaimEntity>> getMyClaims(String receiverId);
 
+  Future<List<ClaimEntity>> getIncomingClaims(String donorId);
+
   Future<void> cancelClaim(String claimId);
+
+  Future<void> confirmClaim({required String claimId, required String donorId});
+
+  Future<void> rejectClaim({required String claimId, required String donorId});
 }
 
 class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
   final FirebaseFirestore _firestore;
 
   ClaimRemoteDatasourceImpl({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+    : _firestore = firestore;
 
   @override
   Future<ClaimEntity> createClaim({
@@ -84,9 +90,95 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
   }
 
   @override
+  Future<List<ClaimEntity>> getIncomingClaims(String donorId) async {
+    final snapshot = await _firestore
+        .collection('claims')
+        .where('donorId', isEqualTo: donorId)
+        .get();
+
+    final claims = snapshot.docs
+        .map((doc) => ClaimModel.fromFirestore(doc))
+        .toList();
+
+    claims.sort((a, b) => b.claimedAt.compareTo(a.claimedAt));
+    return claims;
+  }
+
+  @override
   Future<void> cancelClaim(String claimId) async {
     await _firestore.collection('claims').doc(claimId).update({
       'status': 'cancelled',
     });
+  }
+
+  @override
+  Future<void> confirmClaim({
+    required String claimId,
+    required String donorId,
+  }) async {
+    final claimRef = _firestore.collection('claims').doc(claimId);
+    final claimSnapshot = await claimRef.get();
+
+    if (!claimSnapshot.exists) {
+      throw Exception('Klaim tidak ditemukan');
+    }
+
+    final selectedClaim = ClaimModel.fromFirestore(claimSnapshot);
+    if (selectedClaim.donorId != donorId) {
+      throw Exception('Kamu tidak punya akses ke klaim ini');
+    }
+    if (selectedClaim.status != 'pending') {
+      throw Exception('Hanya klaim pending yang bisa dikonfirmasi');
+    }
+
+    final pendingClaims = await _firestore
+        .collection('claims')
+        .where('foodId', isEqualTo: selectedClaim.foodId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+
+    final now = Timestamp.now();
+    final batch = _firestore.batch();
+
+    for (final doc in pendingClaims.docs) {
+      if (doc.id == claimId) {
+        batch.update(doc.reference, {
+          'status': 'confirmed',
+          'confirmedAt': now,
+        });
+      } else {
+        batch.update(doc.reference, {'status': 'cancelled'});
+      }
+    }
+
+    batch.update(
+      _firestore.collection('food_posts').doc(selectedClaim.foodId),
+      {'status': 'claimed'},
+    );
+
+    await batch.commit();
+  }
+
+  @override
+  Future<void> rejectClaim({
+    required String claimId,
+    required String donorId,
+  }) async {
+    final claimRef = _firestore.collection('claims').doc(claimId);
+    final claimSnapshot = await claimRef.get();
+
+    if (!claimSnapshot.exists) {
+      throw Exception('Klaim tidak ditemukan');
+    }
+
+    final claim = ClaimModel.fromFirestore(claimSnapshot);
+    if (claim.donorId != donorId) {
+      throw Exception('Kamu tidak punya akses ke klaim ini');
+    }
+    if (claim.status != 'pending') {
+      throw Exception('Hanya klaim pending yang bisa ditolak');
+    }
+
+    await claimRef.update({'status': 'cancelled'});
   }
 }

@@ -34,8 +34,11 @@ import 'package:foodbank/features/claim/data/datasources/claim_remote_datasource
 import 'package:foodbank/features/claim/data/repositories/claim_repository_impl.dart';
 import 'package:foodbank/features/claim/domain/repositories/claim_repository.dart';
 import 'package:foodbank/features/claim/domain/usecases/cancel_claim_usecase.dart';
+import 'package:foodbank/features/claim/domain/usecases/confirm_claim_usecase.dart';
 import 'package:foodbank/features/claim/domain/usecases/create_claim_usecase.dart';
+import 'package:foodbank/features/claim/domain/usecases/get_incoming_claims_usecase.dart';
 import 'package:foodbank/features/claim/domain/usecases/get_my_claims_usecase.dart';
+import 'package:foodbank/features/claim/domain/usecases/reject_claim_usecase.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_bloc.dart';
 
 import 'package:foodbank/features/rating/data/datasources/rating_remote_datasource.dart';
@@ -150,11 +153,23 @@ Future<void> configureDependencies() async {
   sl.registerLazySingleton<CancelClaimUsecase>(
     () => CancelClaimUsecase(sl<ClaimRepository>()),
   );
+  sl.registerLazySingleton<GetIncomingClaimsUsecase>(
+    () => GetIncomingClaimsUsecase(sl<ClaimRepository>()),
+  );
+  sl.registerLazySingleton<ConfirmClaimUsecase>(
+    () => ConfirmClaimUsecase(sl<ClaimRepository>()),
+  );
+  sl.registerLazySingleton<RejectClaimUsecase>(
+    () => RejectClaimUsecase(sl<ClaimRepository>()),
+  );
   sl.registerFactory<ClaimBloc>(
     () => ClaimBloc(
       sl<CreateClaimUsecase>(),
       sl<GetMyClaimsUsecase>(),
       sl<CancelClaimUsecase>(),
+      sl<GetIncomingClaimsUsecase>(),
+      sl<ConfirmClaimUsecase>(),
+      sl<RejectClaimUsecase>(),
     ),
   );
 

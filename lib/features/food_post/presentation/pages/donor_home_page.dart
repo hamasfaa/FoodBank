@@ -551,6 +551,14 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
       ),
       actions: [
         IconButton(
+          tooltip: 'Klaim masuk',
+          icon: const Icon(
+            Icons.receipt_long_outlined,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => Navigator.of(context).pushNamed('/donor-claims'),
+        ),
+        IconButton(
           tooltip: 'Profil',
           icon: const Icon(Icons.person_outline, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pushNamed('/donor-profile'),

@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +15,7 @@ import 'package:foodbank/injection_container.dart';
 import 'package:foodbank/admin_users_page.dart';
 import 'package:foodbank/features/food_post/presentation/pages/donor_home_page.dart';
 import 'package:foodbank/features/food_post/presentation/pages/receiver_home_page.dart';
+import 'package:foodbank/features/claim/presentation/pages/donor_claims_page.dart';
 import 'package:foodbank/features/claim/presentation/pages/my_claims_page.dart';
 import 'package:foodbank/features/profile/presentation/pages/donor_profile_page.dart';
 import 'package:foodbank/features/profile/presentation/pages/receiver_profile_page.dart';
@@ -19,6 +23,16 @@ import 'package:foodbank/features/profile/presentation/pages/receiver_profile_pa
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  FlutterError.onError = (errorDetails) {
+    FlutterError.presentError(errorDetails);
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
+    return true;
+  };
+
   await configureDependencies();
   await initializeDateFormatting('id_ID', null);
   runApp(const FoodBankApp());
@@ -43,6 +57,7 @@ class FoodBankApp extends StatelessWidget {
           '/admin-users': (context) => const AdminUsersPage(),
           '/donor-home': (context) => const DonorHomePage(),
           '/receiver-home': (context) => const ReceiverHomePage(),
+          '/donor-claims': (context) => const DonorClaimsPage(),
           '/my-claims': (context) => const MyClaimsPage(),
           '/donor-profile': (context) => const DonorProfilePage(),
           '/receiver-profile': (context) => const ReceiverProfilePage(),

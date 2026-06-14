@@ -36,12 +36,26 @@ class ClaimRepositoryImpl implements ClaimRepository {
   }
 
   @override
-  Future<Either<Failure, List<ClaimEntity>>> getMyClaims(String receiverId) async {
+  Future<Either<Failure, List<ClaimEntity>>> getMyClaims(
+    String receiverId,
+  ) async {
     try {
       final claims = await _datasource.getMyClaims(receiverId);
       return Right(claims);
     } catch (e) {
       return const Left(ServerFailure('Gagal memuat klaim, coba lagi'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ClaimEntity>>> getIncomingClaims(
+    String donorId,
+  ) async {
+    try {
+      final claims = await _datasource.getIncomingClaims(donorId);
+      return Right(claims);
+    } catch (e) {
+      return const Left(ServerFailure('Gagal memuat klaim masuk, coba lagi'));
     }
   }
 
@@ -52,6 +66,32 @@ class ClaimRepositoryImpl implements ClaimRepository {
       return const Right(null);
     } catch (e) {
       return const Left(ServerFailure('Gagal membatalkan klaim, coba lagi'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> confirmClaim({
+    required String claimId,
+    required String donorId,
+  }) async {
+    try {
+      await _datasource.confirmClaim(claimId: claimId, donorId: donorId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString().replaceAll('Exception: ', '')));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> rejectClaim({
+    required String claimId,
+    required String donorId,
+  }) async {
+    try {
+      await _datasource.rejectClaim(claimId: claimId, donorId: donorId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(e.toString().replaceAll('Exception: ', '')));
     }
   }
 }

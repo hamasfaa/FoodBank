@@ -15,6 +15,14 @@ class LoadMyClaims extends ClaimEvent {
   List<Object?> get props => [receiverId];
 }
 
+class LoadIncomingClaims extends ClaimEvent {
+  final String donorId;
+  const LoadIncomingClaims(this.donorId);
+
+  @override
+  List<Object?> get props => [donorId];
+}
+
 class CreateClaim extends ClaimEvent {
   final String foodId;
   final String foodTitle;
@@ -44,4 +52,29 @@ class CancelClaim extends ClaimEvent {
 
   @override
   List<Object?> get props => [claimId];
+}
+
+class ConfirmClaim extends ClaimEvent {
+  final String claimId;
+  final String donorId;
+  final String foodId;
+
+  const ConfirmClaim({
+    required this.claimId,
+    required this.donorId,
+    required this.foodId,
+  });
+
+  @override
+  List<Object?> get props => [claimId, donorId, foodId];
+}
+
+class RejectClaim extends ClaimEvent {
+  final String claimId;
+  final String donorId;
+
+  const RejectClaim({required this.claimId, required this.donorId});
+
+  @override
+  List<Object?> get props => [claimId, donorId];
 }
