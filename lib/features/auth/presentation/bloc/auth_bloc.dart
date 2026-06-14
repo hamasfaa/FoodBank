@@ -23,6 +23,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LoginSubmitted>(_onLoginSubmitted);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<CompleteProfileSubmitted>(_onCompleteProfileSubmitted);
+    on<AuthUserProfileUpdated>(_onAuthUserProfileUpdated);
     on<RoleSelected>(_onRoleSelected);
     on<PasswordVisibilityToggled>(_onPasswordVisibilityToggled);
     on<ConfirmPasswordVisibilityToggled>(_onConfirmPasswordVisibilityToggled);
@@ -69,10 +70,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(status: AuthStatus.loading, clearError: true));
 
     final result = await _loginUsecase(
-      LoginParams(
-        email: event.email,
-        password: event.password,
-      ),
+      LoginParams(email: event.email, password: event.password),
     );
 
     result.fold(
@@ -172,6 +170,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   void _onRoleSelected(RoleSelected event, Emitter<AuthState> emit) {
     emit(state.copyWith(selectedRole: event.role));
+  }
+
+  void _onAuthUserProfileUpdated(
+    AuthUserProfileUpdated event,
+    Emitter<AuthState> emit,
+  ) {
+    emit(state.copyWith(user: event.user));
   }
 
   void _onPasswordVisibilityToggled(

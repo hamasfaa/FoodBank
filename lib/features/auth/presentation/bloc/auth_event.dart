@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:foodbank/features/auth/domain/entities/user_entity.dart';
 
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
@@ -30,10 +31,7 @@ class LoginSubmitted extends AuthEvent {
   final String email;
   final String password;
 
-  const LoginSubmitted({
-    required this.email,
-    required this.password,
-  });
+  const LoginSubmitted({required this.email, required this.password});
 
   @override
   List<Object?> get props => [email, password];
@@ -56,6 +54,15 @@ class CompleteProfileSubmitted extends AuthEvent {
 
   @override
   List<Object?> get props => [fullName, phoneNumber, role];
+}
+
+class AuthUserProfileUpdated extends AuthEvent {
+  final UserEntity user;
+
+  const AuthUserProfileUpdated(this.user);
+
+  @override
+  List<Object?> get props => [user];
 }
 
 class RoleSelected extends AuthEvent {

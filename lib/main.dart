@@ -13,6 +13,7 @@ import 'package:foodbank/admin_users_page.dart';
 import 'package:foodbank/features/food_post/presentation/pages/donor_home_page.dart';
 import 'package:foodbank/features/food_post/presentation/pages/receiver_home_page.dart';
 import 'package:foodbank/features/claim/presentation/pages/my_claims_page.dart';
+import 'package:foodbank/features/profile/presentation/pages/donor_profile_page.dart';
 import 'package:foodbank/features/profile/presentation/pages/receiver_profile_page.dart';
 
 void main() async {
@@ -43,6 +44,7 @@ class FoodBankApp extends StatelessWidget {
           '/donor-home': (context) => const DonorHomePage(),
           '/receiver-home': (context) => const ReceiverHomePage(),
           '/my-claims': (context) => const MyClaimsPage(),
+          '/donor-profile': (context) => const DonorProfilePage(),
           '/receiver-profile': (context) => const ReceiverProfilePage(),
         },
       ),

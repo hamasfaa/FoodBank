@@ -522,6 +522,9 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
   }
 
   AppBar _buildAppBar(BuildContext context) {
+    final currentName =
+        context.watch<AuthBloc>().state.user?.fullName ?? widget.userName;
+
     return AppBar(
       backgroundColor: AppColors.surface,
       elevation: 0,
@@ -530,7 +533,7 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Halo, ${widget.userName}',
+            'Halo, $currentName',
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -546,6 +549,13 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
           ),
         ],
       ),
+      actions: [
+        IconButton(
+          tooltip: 'Profil',
+          icon: const Icon(Icons.person_outline, color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pushNamed('/donor-profile'),
+        ),
+      ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: AppColors.border),
