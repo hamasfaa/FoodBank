@@ -101,6 +101,8 @@ class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
         .collection('food_posts')
         .doc(postId)
         .set(model.toFirestore());
+    unawaited(_notifyReceiversNewFood(model));
+
     return model;
   }
 
@@ -195,6 +197,9 @@ class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
         .where('foodId', isEqualTo: postId)
         .where('status', isEqualTo: 'pending')
         .get();
+    final pendingClaimData = pendingClaims.docs
+        .map((doc) => {'id': doc.id, ...doc.data()})
+        .toList();
 
     final batch = _firestore.batch();
     batch.update(docRef, {'status': 'closed'});
@@ -202,6 +207,7 @@ class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
       batch.update(claim.reference, {'status': 'cancelled'});
     }
     await batch.commit();
+    unawaited(_notifyReceiversPostClosed(current, pendingClaimData));
 
     return FoodPostModel(
       id: current.id,
@@ -338,6 +344,101 @@ class FoodPostRemoteDatasourceImpl implements FoodPostRemoteDatasource {
   void _ensureOwnedByDonor(FoodPostEntity post, String donorId) {
     if (post.donorId != donorId) {
       throw Exception('Kamu tidak punya akses ke postingan ini');
+    }
+  }
+
+  Future<void> _notifyReceiversNewFood(FoodPostEntity post) async {
+    try {
+      final usersSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'receiver')
+          .get();
+
+      final receivers = usersSnapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['isActive'] != false;
+      });
+
+      await Future.wait(
+        receivers.map((doc) {
+          return _createNotification(
+            recipientId: doc.id,
+            senderId: post.donorId,
+            senderName: post.donorName,
+            type: 'new_food_available',
+            title: 'Makanan Baru Tersedia',
+            body:
+                '${post.donorName} baru membagikan ${post.title}. Cek FoodBridge sekarang.',
+            data: {
+              'foodId': post.id,
+              'donorId': post.donorId,
+              'foodTitle': post.title,
+            },
+          );
+        }),
+      );
+    } catch (_) {
+      // Post tetap berhasil dibuat walaupun notifikasi makanan baru gagal.
+    }
+  }
+
+  Future<void> _notifyReceiversPostClosed(
+    FoodPostEntity post,
+    List<Map<String, dynamic>> pendingClaims,
+  ) async {
+    try {
+      await Future.wait(
+        pendingClaims.map((claim) {
+          final receiverId = claim['receiverId']?.toString();
+          if (receiverId == null || receiverId.isEmpty) {
+            return Future.value();
+          }
+
+          return _createNotification(
+            recipientId: receiverId,
+            senderId: post.donorId,
+            senderName: post.donorName,
+            type: 'food_post_closed',
+            title: 'Postingan Ditutup',
+            body:
+                'Postingan ${post.title} sudah ditutup oleh donor. Klaim pending kamu otomatis dibatalkan.',
+            data: {
+              'claimId': claim['id']?.toString() ?? '',
+              'foodId': post.id,
+              'donorId': post.donorId,
+            },
+          );
+        }),
+      );
+    } catch (_) {
+      // Tutup post tetap berhasil walaupun notifikasi receiver gagal.
+    }
+  }
+
+  Future<void> _createNotification({
+    required String recipientId,
+    required String senderId,
+    required String senderName,
+    required String type,
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'recipientId': recipientId,
+        'senderId': senderId,
+        'senderName': senderName,
+        'type': type,
+        'title': title,
+        'body': body,
+        'data': data,
+        'deliveredAt': null,
+        'readAt': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Operasi utama tidak boleh gagal hanya karena notifikasi gagal dibuat.
     }
   }
 }

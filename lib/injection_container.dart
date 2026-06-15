@@ -1,10 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:foodbank/core/services/notification_service.dart';
 import 'package:foodbank/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:foodbank/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:foodbank/features/auth/domain/repositories/auth_repository.dart';
@@ -53,9 +56,21 @@ Future<void> configureDependencies() async {
   // Firebase
   sl.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   sl.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
+  sl.registerLazySingleton<FirebaseMessaging>(() => FirebaseMessaging.instance);
   sl.registerLazySingleton<FirebaseStorage>(() => FirebaseStorage.instance);
+  sl.registerLazySingleton<FlutterLocalNotificationsPlugin>(
+    () => FlutterLocalNotificationsPlugin(),
+  );
   sl.registerLazySingleton<GoogleSignIn>(() => GoogleSignIn());
   sl.registerLazySingleton<http.Client>(() => http.Client());
+  sl.registerLazySingleton<NotificationService>(
+    () => NotificationService(
+      messaging: sl<FirebaseMessaging>(),
+      firestore: sl<FirebaseFirestore>(),
+      auth: sl<FirebaseAuth>(),
+      localNotifications: sl<FlutterLocalNotificationsPlugin>(),
+    ),
+  );
 
   // Auth feature
   sl.registerLazySingleton<AuthRemoteDatasource>(

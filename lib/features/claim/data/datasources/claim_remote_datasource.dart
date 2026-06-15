@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'package:foodbank/features/claim/domain/entities/claim_entity.dart';
@@ -71,6 +73,19 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
     );
 
     await _firestore.collection('claims').doc(claimId).set(model.toFirestore());
+    unawaited(
+      _createNotification(
+        recipientId: donorId,
+        senderId: receiverId,
+        senderName: receiverName,
+        type: 'claim_incoming',
+        title: 'Klaim Baru Masuk',
+        body:
+            '$receiverName ingin mengambil $foodTitle. Buka FoodBridge untuk konfirmasi.',
+        data: {'claimId': claimId, 'foodId': foodId, 'receiverId': receiverId},
+      ),
+    );
+
     return model;
   }
 
@@ -106,9 +121,34 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
 
   @override
   Future<void> cancelClaim(String claimId) async {
-    await _firestore.collection('claims').doc(claimId).update({
-      'status': 'cancelled',
-    });
+    final claimRef = _firestore.collection('claims').doc(claimId);
+    final claimSnapshot = await claimRef.get();
+
+    if (!claimSnapshot.exists) {
+      throw Exception('Klaim tidak ditemukan');
+    }
+
+    final claim = ClaimModel.fromFirestore(claimSnapshot);
+    if (claim.status != 'pending' && claim.status != 'confirmed') {
+      throw Exception('Klaim ini sudah tidak bisa dibatalkan');
+    }
+
+    await claimRef.update({'status': 'cancelled'});
+    unawaited(
+      _createNotification(
+        recipientId: claim.donorId,
+        senderId: claim.receiverId,
+        senderName: claim.receiverName,
+        type: 'claim_cancelled_by_receiver',
+        title: 'Klaim Dibatalkan',
+        body: '${claim.receiverName} membatalkan klaim ${claim.foodTitle}.',
+        data: {
+          'claimId': claim.id,
+          'foodId': claim.foodId,
+          'receiverId': claim.receiverId,
+        },
+      ),
+    );
   }
 
   @override
@@ -131,23 +171,24 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
       throw Exception('Hanya klaim pending yang bisa dikonfirmasi');
     }
 
-    final pendingClaims = await _firestore
+    final pendingClaimsSnapshot = await _firestore
         .collection('claims')
         .where('foodId', isEqualTo: selectedClaim.foodId)
         .where('status', isEqualTo: 'pending')
         .get();
+    final pendingClaims = pendingClaimsSnapshot.docs
+        .map((doc) => ClaimModel.fromFirestore(doc))
+        .toList();
 
     final now = Timestamp.now();
     final batch = _firestore.batch();
 
-    for (final doc in pendingClaims.docs) {
-      if (doc.id == claimId) {
-        batch.update(doc.reference, {
-          'status': 'confirmed',
-          'confirmedAt': now,
-        });
+    for (final claim in pendingClaims) {
+      final ref = _firestore.collection('claims').doc(claim.id);
+      if (claim.id == claimId) {
+        batch.update(ref, {'status': 'confirmed', 'confirmedAt': now});
       } else {
-        batch.update(doc.reference, {'status': 'cancelled'});
+        batch.update(ref, {'status': 'cancelled'});
       }
     }
 
@@ -157,6 +198,40 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
     );
 
     await batch.commit();
+    unawaited(
+      _createNotification(
+        recipientId: selectedClaim.receiverId,
+        senderId: selectedClaim.donorId,
+        senderName: selectedClaim.donorName,
+        type: 'claim_confirmed',
+        title: 'Klaim Diterima',
+        body:
+            'Donor menyetujui klaim ${selectedClaim.foodTitle}. Segera cek detail pickup di FoodBridge.',
+        data: {
+          'claimId': selectedClaim.id,
+          'foodId': selectedClaim.foodId,
+          'donorId': selectedClaim.donorId,
+        },
+      ),
+    );
+    for (final claim in pendingClaims.where((claim) => claim.id != claimId)) {
+      unawaited(
+        _createNotification(
+          recipientId: claim.receiverId,
+          senderId: selectedClaim.donorId,
+          senderName: selectedClaim.donorName,
+          type: 'claim_not_selected',
+          title: 'Klaim Tidak Dipilih',
+          body:
+              'Klaim ${claim.foodTitle} sudah diterima oleh penerima lain. Cek makanan lain yang tersedia.',
+          data: {
+            'claimId': claim.id,
+            'foodId': claim.foodId,
+            'donorId': selectedClaim.donorId,
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -180,5 +255,48 @@ class ClaimRemoteDatasourceImpl implements ClaimRemoteDatasource {
     }
 
     await claimRef.update({'status': 'cancelled'});
+    unawaited(
+      _createNotification(
+        recipientId: claim.receiverId,
+        senderId: claim.donorId,
+        senderName: claim.donorName,
+        type: 'claim_rejected',
+        title: 'Klaim Belum Disetujui',
+        body:
+            'Maaf, klaim ${claim.foodTitle} belum bisa diproses. Cek makanan lain yang tersedia.',
+        data: {
+          'claimId': claim.id,
+          'foodId': claim.foodId,
+          'donorId': claim.donorId,
+        },
+      ),
+    );
+  }
+
+  Future<void> _createNotification({
+    required String recipientId,
+    required String senderId,
+    required String senderName,
+    required String type,
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'recipientId': recipientId,
+        'senderId': senderId,
+        'senderName': senderName,
+        'type': type,
+        'title': title,
+        'body': body,
+        'data': data,
+        'deliveredAt': null,
+        'readAt': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Klaim tetap harus berhasil walaupun notifikasi realtime gagal dibuat.
+    }
   }
 }
