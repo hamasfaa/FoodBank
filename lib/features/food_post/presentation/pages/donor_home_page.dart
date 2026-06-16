@@ -165,8 +165,6 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
                                 post: post,
                                 onEdit: () => _openEditPost(context, post),
                                 onClose: () => _confirmClosePost(context, post),
-                                onDelete: () =>
-                                    _confirmDeletePost(context, post),
                               );
                             },
                           ),
@@ -559,52 +557,6 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
     );
   }
 
-  Future<void> _confirmDeletePost(
-    BuildContext context,
-    FoodPostEntity post,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          'Hapus Postingan?',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Postingan dan fotonya akan dihapus permanen. Aksi ini hanya berhasil kalau postingan belum memiliki klaim.',
-          style: GoogleFonts.inter(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('Batal', style: GoogleFonts.inter()),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(
-              'Hapus',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    final authState = context.read<AuthBloc>().state;
-    context.read<FoodPostBloc>().add(
-      DeleteFoodPostRequested(
-        postId: post.id,
-        donorId: authState.user?.uid ?? '',
-      ),
-    );
-  }
-
   void _showActionError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -766,13 +718,11 @@ class _FoodPostCard extends StatelessWidget {
   final FoodPostEntity post;
   final VoidCallback onEdit;
   final VoidCallback onClose;
-  final VoidCallback onDelete;
 
   const _FoodPostCard({
     required this.post,
     required this.onEdit,
     required this.onClose,
-    required this.onDelete,
   });
 
   @override
@@ -839,7 +789,6 @@ class _FoodPostCard extends StatelessWidget {
                         post: post,
                         onEdit: onEdit,
                         onClose: onClose,
-                        onDelete: onDelete,
                       ),
                     ],
                   ),
@@ -957,24 +906,23 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-enum _FoodPostAction { edit, close, delete }
+enum _FoodPostAction { edit, close }
 
 class _PostActionMenu extends StatelessWidget {
   final FoodPostEntity post;
   final VoidCallback onEdit;
   final VoidCallback onClose;
-  final VoidCallback onDelete;
 
   const _PostActionMenu({
     required this.post,
     required this.onEdit,
     required this.onClose,
-    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     final canChange = post.status == 'available';
+    if (!canChange) return const SizedBox.shrink();
 
     return PopupMenuButton<_FoodPostAction>(
       tooltip: 'Aksi postingan',
@@ -992,31 +940,18 @@ class _PostActionMenu extends StatelessWidget {
           case _FoodPostAction.close:
             onClose();
             break;
-          case _FoodPostAction.delete:
-            onDelete();
-            break;
         }
       },
       itemBuilder: (context) => [
-        if (canChange)
-          PopupMenuItem(
-            value: _FoodPostAction.edit,
-            child: _ActionMenuItem(icon: Icons.edit_outlined, label: 'Edit'),
-          ),
-        if (canChange)
-          PopupMenuItem(
-            value: _FoodPostAction.close,
-            child: _ActionMenuItem(
-              icon: Icons.visibility_off_outlined,
-              label: 'Tutup',
-            ),
-          ),
         PopupMenuItem(
-          value: _FoodPostAction.delete,
+          value: _FoodPostAction.edit,
+          child: _ActionMenuItem(icon: Icons.edit_outlined, label: 'Edit'),
+        ),
+        PopupMenuItem(
+          value: _FoodPostAction.close,
           child: _ActionMenuItem(
-            icon: Icons.delete_outline,
-            label: 'Hapus',
-            color: AppColors.error,
+            icon: Icons.visibility_off_outlined,
+            label: 'Tutup',
           ),
         ),
       ],
@@ -1027,19 +962,19 @@ class _PostActionMenu extends StatelessWidget {
 class _ActionMenuItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color? color;
 
-  const _ActionMenuItem({required this.icon, required this.label, this.color});
+  const _ActionMenuItem({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final itemColor = color ?? AppColors.textPrimary;
-
     return Row(
       children: [
-        Icon(icon, size: 18, color: itemColor),
+        Icon(icon, size: 18, color: AppColors.textPrimary),
         const SizedBox(width: 10),
-        Text(label, style: GoogleFonts.inter(fontSize: 14, color: itemColor)),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
+        ),
       ],
     );
   }
