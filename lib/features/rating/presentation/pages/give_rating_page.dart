@@ -44,10 +44,11 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
   void _submit() {
     if (_score == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih bintang terlebih dahulu'),
+        SnackBar(
+          content: Text('Pilih bintang terlebih dahulu', style: GoogleFonts.inter()),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
@@ -90,10 +91,16 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
         listener: (context, state) {
           if (state.status == RatingStatus.success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Rating berhasil dikirim!'),
+              SnackBar(
+                content: Text(
+                  'Rating berhasil dikirim!',
+                  style: GoogleFonts.inter(),
+                ),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
             Navigator.of(context).pop();
@@ -101,9 +108,15 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
           if (state.status == RatingStatus.failure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.errorMessage ?? 'Gagal mengirim rating'),
+                content: Text(
+                  state.errorMessage ?? 'Gagal mengirim rating',
+                  style: GoogleFonts.inter(),
+                ),
                 backgroundColor: AppColors.error,
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
           }

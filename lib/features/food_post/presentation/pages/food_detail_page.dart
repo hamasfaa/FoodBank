@@ -4,7 +4,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
+import 'package:foodbank/features/auth/domain/entities/user_entity.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_bloc.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_event.dart';
@@ -26,10 +28,24 @@ class FoodDetailPage extends StatelessWidget {
   }
 }
 
-class _FoodDetailView extends StatelessWidget {
+class _FoodDetailView extends StatefulWidget {
   final FoodPostEntity post;
 
   const _FoodDetailView({required this.post});
+
+  @override
+  State<_FoodDetailView> createState() => _FoodDetailViewState();
+}
+
+class _FoodDetailViewState extends State<_FoodDetailView> {
+  final _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +57,16 @@ class _FoodDetailView extends StatelessWidget {
         listener: (context, state) {
           if (state.status == ClaimStatus.success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Klaim berhasil! Status: PENDING'),
+              SnackBar(
+                content: Text(
+                  state.successMessage ?? 'Klaim berhasil!',
+                  style: GoogleFonts.inter(),
+                ),
                 backgroundColor: AppColors.success,
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
             Navigator.of(context).pop();
@@ -52,9 +74,15 @@ class _FoodDetailView extends StatelessWidget {
           if (state.status == ClaimStatus.failure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.errorMessage ?? 'Gagal mengklaim'),
+                content: Text(
+                  state.errorMessage ?? 'Gagal mengklaim',
+                  style: GoogleFonts.inter(),
+                ),
                 backgroundColor: AppColors.error,
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
           }
@@ -90,6 +118,7 @@ class _FoodDetailView extends StatelessWidget {
   }
 
   Widget _buildAppBar(BuildContext context) {
+    final images = widget.post.imageUrls;
     return SliverAppBar(
       expandedHeight: 260,
       pinned: true,
@@ -106,18 +135,72 @@ class _FoodDetailView extends StatelessWidget {
         onPressed: () => Navigator.of(context).pop(),
       ),
       flexibleSpace: FlexibleSpaceBar(
-        background: post.imageUrls.isNotEmpty
-            ? Image.network(
-                post.imageUrls.first,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, e) => Container(
-                  color: AppColors.border,
-                  child: const Icon(Icons.fastfood_outlined, size: 64, color: AppColors.textSecondary),
-                ),
-              )
-            : Container(
+        background: images.isEmpty
+            ? Container(
                 color: AppColors.border,
                 child: const Icon(Icons.fastfood_outlined, size: 64, color: AppColors.textSecondary),
+              )
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    controller: _pageController,
+                    itemCount: images.length,
+                    onPageChanged: (i) => setState(() => _currentPage = i),
+                    itemBuilder: (_, i) => Image.network(
+                      images[i],
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, e) => Container(
+                        color: AppColors.border,
+                        child: const Icon(Icons.fastfood_outlined, size: 64, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                  if (images.length > 1)
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(images.length, (i) {
+                          final active = i == _currentPage;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: active ? 20 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  if (images.length > 1)
+                    Positioned(
+                      top: 12,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_currentPage + 1}/${images.length}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
       ),
     );
@@ -125,7 +208,7 @@ class _FoodDetailView extends StatelessWidget {
 
   Widget _buildTitle() {
     return Text(
-      post.title,
+      widget.post.title,
       style: GoogleFonts.poppins(
         fontSize: 22,
         fontWeight: FontWeight.w700,
@@ -141,7 +224,7 @@ class _FoodDetailView extends StatelessWidget {
           child: _InfoCard(
             icon: Icons.scale_outlined,
             label: 'Jumlah',
-            value: '${post.quantity.toStringAsFixed(0)} g',
+            value: '${widget.post.quantity.toStringAsFixed(0)} g',
           ),
         ),
         const SizedBox(width: 12),
@@ -149,8 +232,8 @@ class _FoodDetailView extends StatelessWidget {
           child: _InfoCard(
             icon: Icons.schedule_outlined,
             label: 'Kedaluwarsa',
-            value: DateFormat('dd MMM yyyy').format(post.expiredAt),
-            valueColor: post.expiredAt.difference(DateTime.now()).inDays < 2
+            value: DateFormat('dd MMM yyyy').format(widget.post.expiredAt),
+            valueColor: widget.post.expiredAt.difference(DateTime.now()).inDays < 2
                 ? AppColors.error
                 : null,
           ),
@@ -173,7 +256,7 @@ class _FoodDetailView extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          post.description,
+          widget.post.description,
           style: GoogleFonts.inter(
             fontSize: 14,
             color: AppColors.textSecondary,
@@ -211,7 +294,7 @@ class _FoodDetailView extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  post.donorName,
+                  widget.post.donorName,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -227,7 +310,7 @@ class _FoodDetailView extends StatelessWidget {
   }
 
   Widget _buildMap() {
-    final point = LatLng(post.location.latitude, post.location.longitude);
+    final point = LatLng(widget.post.location.latitude, widget.post.location.longitude);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -241,7 +324,7 @@ class _FoodDetailView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          post.location.address,
+          widget.post.location.address,
           style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 10),
@@ -274,11 +357,43 @@ class _FoodDetailView extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _openMaps(widget.post.location.latitude, widget.post.location.longitude),
+            icon: const Icon(Icons.map_outlined, size: 18),
+            label: Text(
+              'Buka di Maps',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildClaimButton(BuildContext context, user) {
+  Future<void> _openMaps(double lat, double lng) async {
+    final geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng');
+    if (await canLaunchUrl(geoUri)) {
+      await launchUrl(geoUri);
+      return;
+    }
+    final webUri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+    await launchUrl(webUri, mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildClaimButton(BuildContext context, UserEntity? user) {
     return BlocBuilder<ClaimBloc, ClaimState>(
       builder: (context, state) {
         final isLoading = state.status == ClaimStatus.loading;
@@ -293,11 +408,11 @@ class _FoodDetailView extends StatelessWidget {
                     ? null
                     : () {
                         context.read<ClaimBloc>().add(CreateClaim(
-                              foodId: post.id,
-                              foodTitle: post.title,
-                              foodImageUrl: post.imageUrls.isNotEmpty ? post.imageUrls.first : '',
-                              donorId: post.donorId,
-                              donorName: post.donorName,
+                              foodId: widget.post.id,
+                              foodTitle: widget.post.title,
+                              foodImageUrl: widget.post.imageUrls.isNotEmpty ? widget.post.imageUrls.first : '',
+                              donorId: widget.post.donorId,
+                              donorName: widget.post.donorName,
                               receiverId: user?.uid ?? '',
                               receiverName: user?.fullName ?? '',
                             ));

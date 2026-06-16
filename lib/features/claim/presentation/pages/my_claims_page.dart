@@ -1,15 +1,21 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
+import 'package:foodbank/core/widgets/receiver_navigation_bar.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/claim/domain/entities/claim_entity.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_bloc.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_event.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_state.dart';
+import 'package:foodbank/features/food_post/data/models/food_post_model.dart';
+import 'package:foodbank/features/food_post/presentation/pages/food_detail_page.dart';
 import 'package:foodbank/features/rating/presentation/pages/give_rating_page.dart';
 import 'package:foodbank/injection_container.dart';
+
+enum _ClaimFilter { all, pending, confirmed, cancelled, verified }
 
 class MyClaimsPage extends StatelessWidget {
   const MyClaimsPage({super.key});
@@ -24,8 +30,39 @@ class MyClaimsPage extends StatelessWidget {
   }
 }
 
-class _MyClaimsView extends StatelessWidget {
+class _MyClaimsView extends StatefulWidget {
   const _MyClaimsView();
+
+  @override
+  State<_MyClaimsView> createState() => _MyClaimsViewState();
+}
+
+class _MyClaimsViewState extends State<_MyClaimsView> {
+  _ClaimFilter _filter = _ClaimFilter.all;
+
+  List<ClaimEntity> _filtered(List<ClaimEntity> claims) {
+    return claims.where((claim) {
+      return switch (_filter) {
+        _ClaimFilter.all => true,
+        _ClaimFilter.pending => claim.status == 'pending',
+        _ClaimFilter.confirmed => claim.status == 'confirmed',
+        _ClaimFilter.cancelled => claim.status == 'cancelled',
+        _ClaimFilter.verified => claim.status == 'verified',
+      };
+    }).toList();
+  }
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.inter()),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +71,7 @@ class _MyClaimsView extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Klaimku',
           style: GoogleFonts.poppins(
@@ -51,57 +85,122 @@ class _MyClaimsView extends StatelessWidget {
           child: Container(height: 1, color: AppColors.border),
         ),
       ),
-      body: BlocConsumer<ClaimBloc, ClaimState>(
+      bottomNavigationBar: const ReceiverNavigationBar(
+        currentItem: ReceiverNavItem.claims,
+      ),
+      body: BlocListener<ClaimBloc, ClaimState>(
         listener: (context, state) {
           if (state.status == ClaimStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.errorMessage ?? 'Terjadi kesalahan'),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-              ),
+            _showSnack(
+              state.errorMessage ?? 'Terjadi kesalahan',
+              isError: true,
             );
-          }
-          if (state.status == ClaimStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Klaim dibatalkan'),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+          } else if (state.status == ClaimStatus.success &&
+              state.successMessage != null) {
+            _showSnack(state.successMessage!);
           }
         },
-        builder: (context, state) {
-          if (state.status == ClaimStatus.loading && state.claims.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+        child: BlocBuilder<ClaimBloc, ClaimState>(
+          builder: (context, state) {
+            if (state.status == ClaimStatus.loading && state.claims.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
+
+            final claims = _filtered(state.claims);
+
+            return Column(
+              children: [
+                _buildFilters(),
+                Expanded(
+                  child: claims.isEmpty
+                      ? _buildEmptyState(state.claims.isEmpty)
+                      : RefreshIndicator(
+                          color: AppColors.primary,
+                          onRefresh: () async {
+                            final user =
+                                context.read<AuthBloc>().state.user;
+                            context
+                                .read<ClaimBloc>()
+                                .add(LoadMyClaims(user?.uid ?? ''));
+                          },
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                            itemCount: claims.length,
+                            separatorBuilder: (_, i) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) =>
+                                _ClaimCard(claim: claims[i]),
+                          ),
+                        ),
+                ),
+              ],
             );
-          }
-
-          if (state.claims.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () async {
-              final user = context.read<AuthBloc>().state.user;
-              context.read<ClaimBloc>().add(LoadMyClaims(user?.uid ?? ''));
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-              itemCount: state.claims.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _ClaimCard(claim: state.claims[i]),
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildFilters() {
+    return Container(
+      color: AppColors.background,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: SizedBox(
+        height: 38,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _ClaimFilter.values.length,
+          separatorBuilder: (_, i) => const SizedBox(width: 8),
+          itemBuilder: (_, index) {
+            final filter = _ClaimFilter.values[index];
+            final selected = filter == _filter;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => setState(() => _filter = filter),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _filterIcon(filter),
+                        size: 18,
+                        color: selected ? Colors.white : _filterColor(filter),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _filterLabel(filter),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool noClaimsAtAll) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -109,16 +208,22 @@ class _MyClaimsView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.receipt_long_outlined, size: 56, color: AppColors.primary),
+              child: Icon(
+                noClaimsAtAll
+                    ? Icons.receipt_long_outlined
+                    : Icons.filter_alt_off_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
-              'Belum Ada Klaim',
+              noClaimsAtAll ? 'Belum Ada Klaim' : 'Tidak Ada Hasil',
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -127,7 +232,9 @@ class _MyClaimsView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Kamu belum mengklaim makanan apapun.',
+              noClaimsAtAll
+                  ? 'Kamu belum mengklaim makanan apapun.'
+                  : 'Coba pilih filter status lain.',
               style: GoogleFonts.inter(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -140,15 +247,95 @@ class _MyClaimsView extends StatelessWidget {
       ),
     );
   }
+
+  String _filterLabel(_ClaimFilter filter) {
+    return switch (filter) {
+      _ClaimFilter.all => 'Semua',
+      _ClaimFilter.pending => 'Menunggu',
+      _ClaimFilter.confirmed => 'Dikonfirmasi',
+      _ClaimFilter.cancelled => 'Dibatalkan',
+      _ClaimFilter.verified => 'Terverifikasi',
+    };
+  }
+
+  IconData _filterIcon(_ClaimFilter filter) {
+    return switch (filter) {
+      _ClaimFilter.all => Icons.tune_outlined,
+      _ClaimFilter.pending => Icons.hourglass_empty_outlined,
+      _ClaimFilter.confirmed => Icons.check_circle_outline,
+      _ClaimFilter.cancelled => Icons.cancel_outlined,
+      _ClaimFilter.verified => Icons.verified_outlined,
+    };
+  }
+
+  Color _filterColor(_ClaimFilter filter) {
+    return switch (filter) {
+      _ClaimFilter.all => AppColors.textSecondary,
+      _ClaimFilter.pending => const Color(0xFFF59E0B),
+      _ClaimFilter.confirmed => AppColors.success,
+      _ClaimFilter.cancelled => AppColors.error,
+      _ClaimFilter.verified => AppColors.primary,
+    };
+  }
 }
 
-class _ClaimCard extends StatelessWidget {
+class _ClaimCard extends StatefulWidget {
   final ClaimEntity claim;
 
   const _ClaimCard({required this.claim});
 
   @override
+  State<_ClaimCard> createState() => _ClaimCardState();
+}
+
+class _ClaimCardState extends State<_ClaimCard> {
+  bool _loadingDetail = false;
+
+  Future<void> _openDetail() async {
+    if (_loadingDetail) return;
+    setState(() => _loadingDetail = true);
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('food_posts')
+          .doc(widget.claim.foodId)
+          .get();
+
+      if (!mounted) return;
+
+      if (!doc.exists) {
+        _showError('Data makanan tidak ditemukan');
+        return;
+      }
+
+      final post = FoodPostModel.fromFirestore(doc);
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => FoodDetailPage(post: post)),
+      );
+    } catch (e) {
+      if (mounted) _showError('Gagal memuat detail makanan');
+    } finally {
+      if (mounted) setState(() => _loadingDetail = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.inter()),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final claim = widget.claim;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -163,27 +350,25 @@ class _ClaimCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: claim.foodImageUrl.isNotEmpty
+                      ? Image.network(
+                          claim.foodImageUrl,
+                          width: 82,
+                          height: 82,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, e) => _placeholder(),
+                        )
+                      : _placeholder(),
                 ),
-                child: claim.foodImageUrl.isNotEmpty
-                    ? Image.network(
-                        claim.foodImageUrl,
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, e) => _placeholder(),
-                      )
-                    : _placeholder(),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -204,29 +389,32 @@ class _ClaimCard extends StatelessWidget {
                           _StatusBadge(status: claim.status),
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      _InfoLine(
+                        icon: Icons.person_outline,
+                        text: 'Donor: ${claim.donorName}',
+                      ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Donor: ${claim.donorName}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
+                      _InfoLine(
+                        icon: Icons.schedule_outlined,
+                        text: DateFormat('dd MMM yyyy, HH:mm')
+                            .format(claim.claimedAt),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        DateFormat('dd MMM yyyy, HH:mm').format(claim.claimedAt),
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
+                      if (claim.confirmedAt != null) ...[
+                        const SizedBox(height: 4),
+                        _InfoLine(
+                          icon: Icons.check_circle_outline,
+                          text:
+                              'Dikonfirmasi ${DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(claim.confirmedAt!)}',
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          _buildActions(context),
+          _buildActions(context, claim),
         ],
       ),
     );
@@ -234,42 +422,137 @@ class _ClaimCard extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      width: 90,
-      height: 90,
+      width: 82,
+      height: 82,
       color: AppColors.border,
       child: const Icon(Icons.fastfood_outlined, color: AppColors.textSecondary),
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, ClaimEntity claim) {
     if (claim.status == 'pending') {
-      return _actionBar(
-        child: OutlinedButton(
-          onPressed: () => _confirmCancel(context),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.error,
-            side: const BorderSide(color: AppColors.error),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(vertical: 8),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _confirmCancel(context),
+            icon: const Icon(Icons.close, size: 18),
+            label: Text(
+              'Batalkan Klaim',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
-          child: Text('Batalkan Klaim', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
+      );
+    }
+
+    if (claim.status == 'confirmed') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _loadingDetail ? null : _openDetail,
+            icon: _loadingDetail
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.location_on_outlined, size: 18),
+            label: Text(
+              'Lihat Detail & Lokasi',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
         ),
       );
     }
 
     if (claim.status == 'verified') {
-      return _actionBar(
-        child: ElevatedButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => GiveRatingPage(claim: claim)),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-          ),
-          child: Text('Beri Rating', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _loadingDetail ? null : _openDetail,
+                icon: _loadingDetail
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.info_outline, size: 18),
+                label: Text(
+                  'Detail',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GiveRatingPage(claim: claim),
+                  ),
+                ),
+                icon: const Icon(Icons.star_outline, size: 18),
+                label: Text(
+                  'Beri Rating',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -277,39 +560,43 @@ class _ClaimCard extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
-  Widget _actionBar({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: SizedBox(width: double.infinity, child: child),
-    );
-  }
-
   void _confirmCancel(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Batalkan Klaim?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text(
+          'Batalkan Klaim?',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
         content: Text(
-          'Apakah kamu yakin ingin membatalkan klaim "${claim.foodTitle}"?',
+          'Apakah kamu yakin ingin membatalkan klaim "${widget.claim.foodTitle}"?',
           style: GoogleFonts.inter(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Tidak', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+            child: Text(
+              'Tidak',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.read<ClaimBloc>().add(CancelClaim(claim.id));
+              context.read<ClaimBloc>().add(CancelClaim(widget.claim.id));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: Text('Batalkan', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            child: Text(
+              'Batalkan',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -319,15 +606,16 @@ class _ClaimCard extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final String status;
+
   const _StatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
       'pending' => (const Color(0xFFF59E0B), 'Menunggu'),
-      'confirmed' => (AppColors.primary, 'Dikonfirmasi'),
+      'confirmed' => (AppColors.success, 'Dikonfirmasi'),
       'cancelled' => (AppColors.textSecondary, 'Dibatalkan'),
-      'verified' => (AppColors.success, 'Terverifikasi'),
+      'verified' => (AppColors.primary, 'Terverifikasi'),
       _ => (AppColors.textSecondary, status),
     };
 
@@ -345,6 +633,35 @@ class _StatusBadge extends StatelessWidget {
           color: color,
         ),
       ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 13, color: AppColors.textSecondary),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
