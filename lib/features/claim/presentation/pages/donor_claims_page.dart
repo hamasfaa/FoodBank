@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
+import 'package:foodbank/core/widgets/donor_navigation_bar.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/claim/domain/entities/claim_entity.dart';
 import 'package:foodbank/features/claim/presentation/bloc/claim_bloc.dart';
@@ -57,10 +58,7 @@ class _DonorClaimsViewState extends State<_DonorClaimsView> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Klaim Masuk',
           style: GoogleFonts.poppins(
@@ -73,6 +71,9 @@ class _DonorClaimsViewState extends State<_DonorClaimsView> {
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: AppColors.border),
         ),
+      ),
+      bottomNavigationBar: const DonorNavigationBar(
+        currentItem: DonorNavItem.claims,
       ),
       body: BlocListener<ClaimBloc, ClaimState>(
         listener: (context, state) {

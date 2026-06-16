@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
+import 'package:foodbank/core/widgets/donor_navigation_bar.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/food_post/domain/entities/food_post_entity.dart';
 import 'package:foodbank/features/food_post/presentation/bloc/food_post_bloc.dart';
@@ -81,6 +82,9 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
       floatingActionButton: _buildFAB(context),
+      bottomNavigationBar: const DonorNavigationBar(
+        currentItem: DonorNavItem.donations,
+      ),
       body: BlocListener<FoodPostBloc, FoodPostState>(
         listener: (context, state) {
           if (ModalRoute.of(context)?.isCurrent != true) return;
@@ -549,21 +553,6 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          tooltip: 'Klaim masuk',
-          icon: const Icon(
-            Icons.receipt_long_outlined,
-            color: AppColors.textPrimary,
-          ),
-          onPressed: () => Navigator.of(context).pushNamed('/donor-claims'),
-        ),
-        IconButton(
-          tooltip: 'Profil',
-          icon: const Icon(Icons.person_outline, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pushNamed('/donor-profile'),
-        ),
-      ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: AppColors.border),

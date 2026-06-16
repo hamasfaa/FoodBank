@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
 import 'package:foodbank/core/utils/validators.dart';
+import 'package:foodbank/core/widgets/donor_navigation_bar.dart';
 import 'package:foodbank/features/auth/domain/entities/user_entity.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_event.dart';
@@ -209,10 +210,7 @@ class _DonorProfilePageState extends State<DonorProfilePage> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Profil Donor',
           style: GoogleFonts.poppins(
@@ -233,6 +231,9 @@ class _DonorProfilePageState extends State<DonorProfilePage> {
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: AppColors.border),
         ),
+      ),
+      bottomNavigationBar: const DonorNavigationBar(
+        currentItem: DonorNavItem.profile,
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),

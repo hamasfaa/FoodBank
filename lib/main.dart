@@ -114,7 +114,7 @@ class FoodBankApp extends StatelessWidget {
           title: 'FoodBridge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
-          initialRoute: '/admin-dashboard',
+          initialRoute: '/login',
           routes: {
             '/register': (context) => const RegisterPage(),
             '/complete-profile': (context) => const CompleteProfilePage(),
