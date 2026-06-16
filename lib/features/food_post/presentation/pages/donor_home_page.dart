@@ -131,11 +131,17 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
             final posts = _filteredPosts(state.myPosts);
 
             if (state.myPosts.isEmpty) {
-              return _buildEmptyState(context);
+              return Column(
+                children: [
+                  _buildStatsSummary(state.myPosts),
+                  Expanded(child: _buildEmptyState(context)),
+                ],
+              );
             }
 
             return Column(
               children: [
+                _buildStatsSummary(state.myPosts),
                 _buildSearchAndFilters(),
                 Expanded(
                   child: posts.isEmpty
@@ -171,6 +177,91 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildStatsSummary(List<FoodPostEntity> posts) {
+    final stats = _donationStats(posts);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ringkasan Donasi',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.15,
+            children: [
+              _StatTile(
+                icon: Icons.inventory_2_outlined,
+                label: 'Total dibuat',
+                value: stats.total,
+                color: AppColors.primary,
+              ),
+              _StatTile(
+                icon: Icons.check_circle_outline,
+                label: 'Aktif',
+                value: stats.active,
+                color: AppColors.success,
+              ),
+              _StatTile(
+                icon: Icons.receipt_long_outlined,
+                label: 'Berhasil diklaim',
+                value: stats.claimed,
+                color: const Color(0xFFF59E0B),
+              ),
+              _StatTile(
+                icon: Icons.event_busy_outlined,
+                label: 'Kedaluwarsa',
+                value: stats.expired,
+                color: AppColors.error,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  ({int total, int active, int claimed, int expired}) _donationStats(
+    List<FoodPostEntity> posts,
+  ) {
+    final now = DateTime.now();
+    var active = 0;
+    var claimed = 0;
+    var expired = 0;
+
+    for (final post in posts) {
+      final status = post.status.toLowerCase();
+      final isExpired =
+          status == 'expired' ||
+          (status == 'available' && !post.expiredAt.isAfter(now));
+
+      if (status == 'available' && !isExpired) active += 1;
+      if (status == 'claimed' || status == 'reserved' || status == 'taken') {
+        claimed += 1;
+      }
+      if (isExpired) expired += 1;
+    }
+
+    return (
+      total: posts.length,
+      active: active,
+      claimed: claimed,
+      expired: expired,
     );
   }
 
@@ -782,6 +873,82 @@ class _FoodPostCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final Color color;
+
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value.toString(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ],
