@@ -10,9 +10,13 @@ import 'package:foodbank/injection_container.dart';
 class ClaimModel {
   final String id;
   final String foodId;
-  final String donorUid;
-  final String receiverUid;
-  final String status; // PENDING | CONFIRMED | CANCELLED | VERIFIED
+  final String foodTitle;
+  final String foodImageUrl;
+  final String donorId;
+  final String donorName;
+  final String receiverId;
+  final String receiverName;
+  final String status; // pending | confirmed | cancelled | verified
   final bool isVerifiedByAdmin;
   final DateTime? claimedAt;
   final DateTime? confirmedAt;
@@ -20,8 +24,12 @@ class ClaimModel {
   const ClaimModel({
     required this.id,
     required this.foodId,
-    required this.donorUid,
-    required this.receiverUid,
+    required this.foodTitle,
+    required this.foodImageUrl,
+    required this.donorId,
+    required this.donorName,
+    required this.receiverId,
+    required this.receiverName,
     required this.status,
     required this.isVerifiedByAdmin,
     required this.claimedAt,
@@ -33,9 +41,13 @@ class ClaimModel {
     return ClaimModel(
       id: doc.id,
       foodId: data['foodId'] ?? '',
-      donorUid: data['donorUid'] ?? '',
-      receiverUid: data['receiverUid'] ?? '',
-      status: data['status'] ?? 'UNKNOWN',
+      foodTitle: data['foodTitle'] ?? '',
+      foodImageUrl: data['foodImageUrl'] ?? '',
+      donorId: data['donorId'] ?? '',
+      donorName: data['donorName'] ?? '',
+      receiverId: data['receiverId'] ?? '',
+      receiverName: data['receiverName'] ?? '',
+      status: data['status'] ?? 'unknown',
       isVerifiedByAdmin: data['isVerifiedByAdmin'] ?? false,
       claimedAt: (data['claimedAt'] as Timestamp?)?.toDate(),
       confirmedAt: (data['confirmedAt'] as Timestamp?)?.toDate(),
@@ -46,8 +58,12 @@ class ClaimModel {
     return ClaimModel(
       id: id,
       foodId: foodId,
-      donorUid: donorUid,
-      receiverUid: receiverUid,
+      foodTitle: foodTitle,
+      foodImageUrl: foodImageUrl,
+      donorId: donorId,
+      donorName: donorName,
+      receiverId: receiverId,
+      receiverName: receiverName,
       status: status ?? this.status,
       isVerifiedByAdmin: isVerifiedByAdmin ?? this.isVerifiedByAdmin,
       claimedAt: claimedAt,
@@ -195,7 +211,7 @@ class AdminClaimsPage extends StatelessWidget {
   }
 }
 
-class _AdminClaimsListView extends StatelessWidget {
+class _AdminClaimsListView extends StatefulWidget {
   final String status;
   final String emptyMessage;
   final bool showVerifyButton;
@@ -207,7 +223,17 @@ class _AdminClaimsListView extends StatelessWidget {
   });
 
   @override
+  State<_AdminClaimsListView> createState() => _AdminClaimsListViewState();
+}
+
+class _AdminClaimsListViewState extends State<_AdminClaimsListView>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     return BlocConsumer<AdminClaimsBloc, AdminClaimsState>(
       listener: (context, state) {
         if (state is AdminClaimsLoaded && state.actionError != null) {
@@ -233,7 +259,7 @@ class _AdminClaimsListView extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () => context
                       .read<AdminClaimsBloc>()
-                      .add(FetchClaimsByStatusEvent(status)),
+                      .add(FetchClaimsByStatusEvent(widget.status)),
                   child: const Text('Retry'),
                 ),
               ],
@@ -245,12 +271,14 @@ class _AdminClaimsListView extends StatelessWidget {
           return RefreshIndicator(
             onRefresh: () async => context
                 .read<AdminClaimsBloc>()
-                .add(FetchClaimsByStatusEvent(status)),
+                .add(FetchClaimsByStatusEvent(widget.status)),
             child: state.claims.isEmpty
                 ? ListView(
                     children: [
-                      const SizedBox(height: 120),
-                      Center(child: Text(emptyMessage)),
+                      SizedBox(
+                        height: 300,
+                        child: Center(child: Text(widget.emptyMessage)),
+                      ),
                     ],
                   )
                 : ListView.separated(
@@ -260,13 +288,22 @@ class _AdminClaimsListView extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final claim = state.claims[index];
                       return ListTile(
-                        leading: const Icon(Icons.local_shipping_outlined),
-                        title: Text('Food: ${claim.foodId}'),
+                        leading: claim.foodImageUrl.isNotEmpty
+                            ? CircleAvatar(
+                                backgroundImage:
+                                    NetworkImage(claim.foodImageUrl),
+                              )
+                            : const Icon(Icons.local_shipping_outlined),
+                        title: Text(
+                          claim.foodTitle.isNotEmpty
+                              ? claim.foodTitle
+                              : '(food: ${claim.foodId})',
+                        ),
                         subtitle: Text(
-                          'Donor: ${claim.donorUid}\nReceiver: ${claim.receiverUid}',
+                          'Donor: ${claim.donorName}\nReceiver: ${claim.receiverName}',
                         ),
                         isThreeLine: true,
-                        trailing: showVerifyButton
+                        trailing: widget.showVerifyButton
                             ? ElevatedButton(
                                 onPressed: () => context
                                     .read<AdminClaimsBloc>()
