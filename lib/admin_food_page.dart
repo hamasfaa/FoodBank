@@ -11,10 +11,11 @@ class FoodModel {
   final String id;
   final String title;
   final String description;
-  final int quantity;
-  final String status; // AVAILABLE | CLAIMED | CLOSED | EXPIRED
-  final String donorUid;
-  final String imageUrl;
+  final double quantity;
+  final String status; // available | closed | expired | claimed
+  final String donorId;
+  final String donorName;
+  final List<String> imageUrls;
   final DateTime? expiredAt;
 
   const FoodModel({
@@ -23,8 +24,9 @@ class FoodModel {
     required this.description,
     required this.quantity,
     required this.status,
-    required this.donorUid,
-    required this.imageUrl,
+    required this.donorId,
+    required this.donorName,
+    required this.imageUrls,
     required this.expiredAt,
   });
 
@@ -34,10 +36,11 @@ class FoodModel {
       id: doc.id,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
-      quantity: data['quantity'] ?? 0,
-      status: data['status'] ?? 'UNKNOWN',
-      donorUid: data['donorUid'] ?? '',
-      imageUrl: data['imageUrl'] ?? '',
+      quantity: (data['quantity'] as num?)?.toDouble() ?? 0,
+      status: data['status'] ?? 'unknown',
+      donorId: data['donorId'] ?? '',
+      donorName: data['donorName'] ?? '',
+      imageUrls: (data['imageUrls'] as List?)?.cast<String>() ?? [],
       expiredAt: (data['expiredAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -49,8 +52,9 @@ class FoodModel {
       description: description,
       quantity: quantity,
       status: status ?? this.status,
-      donorUid: donorUid,
-      imageUrl: imageUrl,
+      donorId: donorId,
+      donorName: donorName,
+      imageUrls: imageUrls,
       expiredAt: expiredAt,
     );
   }
@@ -109,7 +113,7 @@ class AdminFoodBloc extends Bloc<AdminFoodEvent, AdminFoodState> {
     emit(AdminFoodLoading());
     try {
       final snapshot = await _firestore
-          .collection('foods')
+          .collection('food_posts')
           .orderBy('createdAt', descending: true)
           .get();
       final foods = snapshot.docs.map(FoodModel.fromFirestore).toList();
@@ -127,15 +131,15 @@ class AdminFoodBloc extends Bloc<AdminFoodEvent, AdminFoodState> {
     if (currentState is! AdminFoodLoaded) return;
 
     final updated = currentState.foods.map((f) {
-      return f.id == event.foodId ? f.copyWith(status: 'CLOSED') : f;
+      return f.id == event.foodId ? f.copyWith(status: 'closed') : f;
     }).toList();
     emit(AdminFoodLoaded(updated));
 
     try {
       await _firestore
-          .collection('foods')
+          .collection('food_posts')
           .doc(event.foodId)
-          .update({'status': 'CLOSED'});
+          .update({'status': 'closed'});
     } catch (e) {
       emit(AdminFoodLoaded(currentState.foods, actionError: e.toString()));
     }
@@ -164,13 +168,13 @@ class _AdminFoodView extends StatelessWidget {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'AVAILABLE':
+      case 'available':
         return Colors.green;
-      case 'CLAIMED':
+      case 'claimed':
         return Colors.orange;
-      case 'CLOSED':
+      case 'closed':
         return Colors.grey;
-      case 'EXPIRED':
+      case 'expired':
         return Colors.red;
       default:
         return Colors.blueGrey;
@@ -234,18 +238,20 @@ class _AdminFoodView extends StatelessWidget {
               itemBuilder: (context, index) {
                 final food = state.foods[index];
                 final canClose =
-                    food.status == 'AVAILABLE' || food.status == 'CLAIMED';
+                    food.status == 'available' || food.status == 'claimed';
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: food.imageUrl.isNotEmpty
-                        ? NetworkImage(food.imageUrl)
+                    backgroundImage: food.imageUrls.isNotEmpty
+                        ? NetworkImage(food.imageUrls.first)
                         : null,
-                    child: food.imageUrl.isEmpty
+                    child: food.imageUrls.isEmpty
                         ? const Icon(Icons.restaurant)
                         : null,
                   ),
                   title: Text(food.title.isNotEmpty ? food.title : '(no title)'),
-                  subtitle: Text('Qty: ${food.quantity} · Donor: ${food.donorUid}'),
+                  subtitle: Text(
+                    'Qty: ${food.quantity.toStringAsFixed(0)}g · Donor: ${food.donorName.isNotEmpty ? food.donorName : food.donorId}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
