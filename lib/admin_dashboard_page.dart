@@ -50,7 +50,8 @@ class AdminStatsBloc extends Bloc<AdminStatsEvent, AdminStatsState> {
       final usersCount =
           (await _firestore.collection('users').count().get()).count ?? 0;
       final postsCount =
-          (await _firestore.collection('foods').count().get()).count ?? 0;
+          (await _firestore.collection('food_posts').count().get()).count ??
+              0;
       final pendingClaimsCount = (await _firestore
                   .collection('claims')
                   .where('status', isEqualTo: 'PENDING')

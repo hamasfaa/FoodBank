@@ -114,7 +114,7 @@ class FoodBankApp extends StatelessWidget {
           title: 'FoodBridge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
-          initialRoute: '/login',
+          initialRoute: '/admin-dashboard',
           routes: {
             '/register': (context) => const RegisterPage(),
             '/complete-profile': (context) => const CompleteProfilePage(),
@@ -126,6 +126,9 @@ class FoodBankApp extends StatelessWidget {
             '/my-claims': (context) => const MyClaimsPage(),
             '/donor-profile': (context) => const DonorProfilePage(),
             '/receiver-profile': (context) => const ReceiverProfilePage(),
+            '/admin-dashboard': (context) => const AdminDashboardPage(),
+            '/admin-food': (context) => const AdminFoodPage(),
+            '/admin-claims': (context) => const AdminClaimsPage(),
           },
         ),
       ),
