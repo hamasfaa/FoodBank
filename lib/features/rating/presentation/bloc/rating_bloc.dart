@@ -22,7 +22,6 @@ class RatingBloc extends Bloc<RatingEvent, RatingState> {
       receiverId: event.receiverId,
       score: event.score,
       comment: event.comment,
-      photoUrl: event.photoUrl,
     ));
 
     result.fold(

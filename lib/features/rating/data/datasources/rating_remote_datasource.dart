@@ -10,7 +10,6 @@ abstract class RatingRemoteDatasource {
     required String receiverId,
     required int score,
     required String comment,
-    required String photoUrl,
   });
 }
 
@@ -27,7 +26,6 @@ class RatingRemoteDatasourceImpl implements RatingRemoteDatasource {
     required String receiverId,
     required int score,
     required String comment,
-    required String photoUrl,
   }) async {
     final existing = await _firestore
         .collection('ratings')
@@ -49,8 +47,6 @@ class RatingRemoteDatasourceImpl implements RatingRemoteDatasource {
       receiverId: receiverId,
       score: score,
       comment: comment,
-      photoUrl: photoUrl,
-      isVerifiedByAdmin: false,
       createdAt: now,
     );
 

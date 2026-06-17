@@ -13,7 +13,6 @@ class SubmitRating extends RatingEvent {
   final String receiverId;
   final int score;
   final String comment;
-  final String photoUrl;
 
   const SubmitRating({
     required this.claimId,
@@ -21,9 +20,8 @@ class SubmitRating extends RatingEvent {
     required this.receiverId,
     required this.score,
     required this.comment,
-    required this.photoUrl,
   });
 
   @override
-  List<Object?> get props => [claimId, score, comment, photoUrl];
+  List<Object?> get props => [claimId, score, comment];
 }

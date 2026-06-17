@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
 import 'package:foodbank/core/widgets/receiver_navigation_bar.dart';
 import 'package:foodbank/features/auth/presentation/bloc/auth_bloc.dart';
@@ -292,11 +297,12 @@ class _ClaimCardState extends State<_ClaimCard> {
   bool _loadingDetail = false;
   bool _hasRated = false;
   bool _checkingRating = false;
+  bool _uploadingProof = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.claim.status == 'confirmed') {
+    if (widget.claim.status == 'verified') {
       _checkExistingRating();
     }
   }
@@ -315,6 +321,94 @@ class _ClaimCardState extends State<_ClaimCard> {
     } finally {
       if (mounted) setState(() => _checkingRating = false);
     }
+  }
+
+  Future<void> _pickAndUploadProof(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 75,
+      maxWidth: 1080,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingProof = true);
+    try {
+      const uuid = Uuid();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('claims/${widget.claim.id}/${uuid.v4()}_proof.jpg');
+      await ref.putFile(File(picked.path));
+      final photoUrl = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('claims')
+          .doc(widget.claim.id)
+          .update({'proofPhotoUrl': photoUrl});
+
+      if (mounted) {
+        final user = context.read<AuthBloc>().state.user;
+        context.read<ClaimBloc>().add(LoadMyClaims(user?.uid ?? ''));
+      }
+    } catch (e) {
+      if (mounted) _showError('Gagal mengupload foto bukti');
+    } finally {
+      if (mounted) setState(() => _uploadingProof = false);
+    }
+  }
+
+  void _showProofSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Pilih Sumber Foto',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined,
+                    color: AppColors.primary),
+                title: Text('Kamera', style: GoogleFonts.inter()),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndUploadProof(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined,
+                    color: AppColors.textSecondary),
+                title: Text('Galeri', style: GoogleFonts.inter()),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndUploadProof(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openDetail() async {
@@ -459,45 +553,18 @@ class _ClaimCardState extends State<_ClaimCard> {
     if (claim.status == 'pending') {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _confirmCancel(context),
-            icon: const Icon(Icons.close, size: 18),
-            label: Text(
-              'Batalkan Klaim',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.error),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (claim.status == 'confirmed') {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Column(
           children: [
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: _loadingDetail ? null : _openDetail,
                 icon: _loadingDetail
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: Colors.white,
                           strokeWidth: 2,
                         ),
                       )
@@ -509,9 +576,9 @@ class _ClaimCardState extends State<_ClaimCard> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -519,21 +586,202 @@ class _ClaimCardState extends State<_ClaimCard> {
               ),
             ),
             const SizedBox(height: 8),
-            if (_checkingRating)
-              Container(
-                width: double.infinity,
-                height: 42,
-                alignment: Alignment.center,
-                child: const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                    strokeWidth: 2,
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmCancel(context),
+                icon: const Icon(Icons.close, size: 18),
+                label: Text(
+                  'Batalkan Klaim',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (claim.status == 'confirmed') {
+      final hasProof = claim.proofPhotoUrl != null &&
+          claim.proofPhotoUrl!.isNotEmpty;
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: hasProof
+            ? Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.hourglass_top_outlined,
+                        size: 15, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Foto bukti dikirim · menunggu verifikasi admin',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFF59E0B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               )
-            else if (_hasRated)
+            : Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _loadingDetail ? null : _openDetail,
+                      icon: _loadingDetail
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  color: AppColors.primary, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.location_on_outlined, size: 18),
+                      label: Text(
+                        'Lihat Detail & Lokasi',
+                        style: GoogleFonts.poppins(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _uploadingProof ? null : _showProofSourcePicker,
+                      icon: _uploadingProof
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.camera_alt_outlined, size: 18),
+                      label: Text(
+                        'Upload Foto Bukti Pengambilan',
+                        style: GoogleFonts.poppins(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      );
+    }
+
+    if (claim.status == 'verified') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _loadingDetail ? null : _openDetail,
+                    icon: _loadingDetail
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.info_outline, size: 18),
+                    label: Text(
+                      'Detail',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!_hasRated) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _checkingRating
+                          ? null
+                          : () => Navigator.of(context)
+                              .push(MaterialPageRoute(
+                                  builder: (_) => GiveRatingPage(claim: claim)))
+                              .then((_) => _checkExistingRating()),
+                      icon: _checkingRating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.star_outline, size: 18),
+                      label: Text(
+                        'Beri Rating',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (_hasRated) ...[
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
@@ -561,69 +809,9 @@ class _ClaimCardState extends State<_ClaimCard> {
                     ),
                   ],
                 ),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context)
-                      .push(MaterialPageRoute(
-                          builder: (_) => GiveRatingPage(claim: claim)))
-                      .then((_) => _checkExistingRating()),
-                  icon: const Icon(Icons.star_outline, size: 18),
-                  label: Text(
-                    'Beri Rating + Foto Bukti',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
               ),
+            ],
           ],
-        ),
-      );
-    }
-
-    if (claim.status == 'verified') {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _loadingDetail ? null : _openDetail,
-            icon: _loadingDetail
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.info_outline, size: 18),
-            label: Text(
-              'Detail',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
         ),
       );
     }

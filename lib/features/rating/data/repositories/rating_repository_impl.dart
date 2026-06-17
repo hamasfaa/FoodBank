@@ -16,7 +16,6 @@ class RatingRepositoryImpl implements RatingRepository {
     required String receiverId,
     required int score,
     required String comment,
-    required String photoUrl,
   }) async {
     try {
       final rating = await _datasource.createRating(
@@ -25,7 +24,6 @@ class RatingRepositoryImpl implements RatingRepository {
         receiverId: receiverId,
         score: score,
         comment: comment,
-        photoUrl: photoUrl,
       );
       return Right(rating);
     } catch (e) {

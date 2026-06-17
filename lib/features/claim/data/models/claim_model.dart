@@ -15,6 +15,7 @@ class ClaimModel extends ClaimEntity {
     required super.claimedAt,
     super.confirmedAt,
     super.isVerifiedByAdmin,
+    super.proofPhotoUrl,
   });
 
   factory ClaimModel.fromFirestore(DocumentSnapshot doc) {
@@ -34,6 +35,7 @@ class ClaimModel extends ClaimEntity {
           ? (data['confirmedAt'] as Timestamp).toDate()
           : null,
       isVerifiedByAdmin: data['isVerifiedByAdmin'] as bool? ?? false,
+      proofPhotoUrl: data['proofPhotoUrl'] as String?,
     );
   }
 
@@ -50,5 +52,6 @@ class ClaimModel extends ClaimEntity {
         'confirmedAt':
             confirmedAt != null ? Timestamp.fromDate(confirmedAt!) : null,
         'isVerifiedByAdmin': isVerifiedByAdmin,
+        'proofPhotoUrl': proofPhotoUrl,
       };
 }

@@ -13,6 +13,7 @@ class ClaimEntity extends Equatable {
   final DateTime claimedAt;
   final DateTime? confirmedAt;
   final bool isVerifiedByAdmin;
+  final String? proofPhotoUrl;
 
   const ClaimEntity({
     required this.id,
@@ -27,12 +28,14 @@ class ClaimEntity extends Equatable {
     required this.claimedAt,
     this.confirmedAt,
     this.isVerifiedByAdmin = false,
+    this.proofPhotoUrl,
   });
 
   ClaimEntity copyWith({
     String? status,
     DateTime? confirmedAt,
     bool? isVerifiedByAdmin,
+    String? proofPhotoUrl,
   }) {
     return ClaimEntity(
       id: id,
@@ -47,6 +50,7 @@ class ClaimEntity extends Equatable {
       claimedAt: claimedAt,
       confirmedAt: confirmedAt ?? this.confirmedAt,
       isVerifiedByAdmin: isVerifiedByAdmin ?? this.isVerifiedByAdmin,
+      proofPhotoUrl: proofPhotoUrl ?? this.proofPhotoUrl,
     );
   }
 
@@ -64,5 +68,6 @@ class ClaimEntity extends Equatable {
     claimedAt,
     confirmedAt,
     isVerifiedByAdmin,
+    proofPhotoUrl,
   ];
 }

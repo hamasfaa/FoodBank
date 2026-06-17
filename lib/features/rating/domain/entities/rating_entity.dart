@@ -7,8 +7,6 @@ class RatingEntity extends Equatable {
   final String receiverId;
   final int score;
   final String comment;
-  final String photoUrl;
-  final bool isVerifiedByAdmin;
   final DateTime createdAt;
 
   const RatingEntity({
@@ -18,21 +16,9 @@ class RatingEntity extends Equatable {
     required this.receiverId,
     required this.score,
     required this.comment,
-    required this.photoUrl,
-    required this.isVerifiedByAdmin,
     required this.createdAt,
   });
 
   @override
-  List<Object?> get props => [
-        id,
-        claimId,
-        donorId,
-        receiverId,
-        score,
-        comment,
-        photoUrl,
-        isVerifiedByAdmin,
-        createdAt,
-      ];
+  List<Object?> get props => [id, claimId, donorId, receiverId, score, comment, createdAt];
 }

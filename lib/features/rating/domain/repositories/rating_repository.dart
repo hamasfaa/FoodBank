@@ -9,6 +9,5 @@ abstract class RatingRepository {
     required String receiverId,
     required int score,
     required String comment,
-    required String photoUrl,
   });
 }
