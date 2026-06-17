@@ -62,7 +62,10 @@ class ClaimModel {
 
 abstract class AdminClaimsEvent {}
 
-class FetchConfirmedClaimsEvent extends AdminClaimsEvent {}
+class FetchClaimsByStatusEvent extends AdminClaimsEvent {
+  final String status;
+  FetchClaimsByStatusEvent(this.status);
+}
 
 class VerifyClaimEvent extends AdminClaimsEvent {
   final String claimId;
@@ -96,21 +99,23 @@ class AdminClaimsError extends AdminClaimsState {
 
 class AdminClaimsBloc extends Bloc<AdminClaimsEvent, AdminClaimsState> {
   final FirebaseFirestore _firestore;
+  String _lastStatus = 'pending';
 
   AdminClaimsBloc(this._firestore) : super(AdminClaimsInitial()) {
-    on<FetchConfirmedClaimsEvent>(_onFetchConfirmedClaims);
+    on<FetchClaimsByStatusEvent>(_onFetchClaimsByStatus);
     on<VerifyClaimEvent>(_onVerifyClaim);
   }
 
-  Future<void> _onFetchConfirmedClaims(
-    FetchConfirmedClaimsEvent event,
+  Future<void> _onFetchClaimsByStatus(
+    FetchClaimsByStatusEvent event,
     Emitter<AdminClaimsState> emit,
   ) async {
+    _lastStatus = event.status;
     emit(AdminClaimsLoading());
     try {
       final snapshot = await _firestore
           .collection('claims')
-          .where('status', isEqualTo: 'CONFIRMED')
+          .where('status', isEqualTo: event.status)
           .get();
       final claims = snapshot.docs.map(ClaimModel.fromFirestore).toList();
       emit(AdminClaimsLoaded(claims));
@@ -133,7 +138,7 @@ class AdminClaimsBloc extends Bloc<AdminClaimsEvent, AdminClaimsState> {
 
     try {
       await _firestore.collection('claims').doc(event.claimId).update({
-        'status': 'VERIFIED',
+        'status': 'verified',
         'isVerifiedByAdmin': true,
       });
     } catch (e) {
@@ -151,98 +156,132 @@ class AdminClaimsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => AdminClaimsBloc(sl<FirebaseFirestore>())
-        ..add(FetchConfirmedClaimsEvent()),
-      child: const _AdminClaimsView(),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Admin — Claims'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Pending'),
+              Tab(text: 'Awaiting Verification'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            BlocProvider(
+              create: (_) => AdminClaimsBloc(sl<FirebaseFirestore>())
+                ..add(FetchClaimsByStatusEvent('pending')),
+              child: const _AdminClaimsListView(
+                status: 'pending',
+                emptyMessage: 'No pending claims.',
+                showVerifyButton: false,
+              ),
+            ),
+            BlocProvider(
+              create: (_) => AdminClaimsBloc(sl<FirebaseFirestore>())
+                ..add(FetchClaimsByStatusEvent('confirmed')),
+              child: const _AdminClaimsListView(
+                status: 'confirmed',
+                emptyMessage: 'No claims waiting for verification.',
+                showVerifyButton: true,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _AdminClaimsView extends StatelessWidget {
-  const _AdminClaimsView();
+class _AdminClaimsListView extends StatelessWidget {
+  final String status;
+  final String emptyMessage;
+  final bool showVerifyButton;
+
+  const _AdminClaimsListView({
+    required this.status,
+    required this.emptyMessage,
+    required this.showVerifyButton,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin — Verify Claims'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: () => context
+    return BlocConsumer<AdminClaimsBloc, AdminClaimsState>(
+      listener: (context, state) {
+        if (state is AdminClaimsLoaded && state.actionError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Verify failed: ${state.actionError}')),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is AdminClaimsLoading || state is AdminClaimsInitial) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is AdminClaimsError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 12),
+                Text(state.message, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => context
+                      .read<AdminClaimsBloc>()
+                      .add(FetchClaimsByStatusEvent(status)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (state is AdminClaimsLoaded) {
+          return RefreshIndicator(
+            onRefresh: () async => context
                 .read<AdminClaimsBloc>()
-                .add(FetchConfirmedClaimsEvent()),
-          ),
-        ],
-      ),
-      body: BlocConsumer<AdminClaimsBloc, AdminClaimsState>(
-        listener: (context, state) {
-          if (state is AdminClaimsLoaded && state.actionError != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Verify failed: ${state.actionError}')),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is AdminClaimsLoading || state is AdminClaimsInitial) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is AdminClaimsError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 12),
-                  Text(state.message, textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () => context
-                        .read<AdminClaimsBloc>()
-                        .add(FetchConfirmedClaimsEvent()),
-                    child: const Text('Retry'),
+                .add(FetchClaimsByStatusEvent(status)),
+            child: state.claims.isEmpty
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 120),
+                      Center(child: Text(emptyMessage)),
+                    ],
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: state.claims.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final claim = state.claims[index];
+                      return ListTile(
+                        leading: const Icon(Icons.local_shipping_outlined),
+                        title: Text('Food: ${claim.foodId}'),
+                        subtitle: Text(
+                          'Donor: ${claim.donorUid}\nReceiver: ${claim.receiverUid}',
+                        ),
+                        isThreeLine: true,
+                        trailing: showVerifyButton
+                            ? ElevatedButton(
+                                onPressed: () => context
+                                    .read<AdminClaimsBloc>()
+                                    .add(VerifyClaimEvent(claim.id)),
+                                child: const Text('Verify'),
+                              )
+                            : null,
+                      );
+                    },
                   ),
-                ],
-              ),
-            );
-          }
+          );
+        }
 
-          if (state is AdminClaimsLoaded) {
-            if (state.claims.isEmpty) {
-              return const Center(
-                child: Text('No claims waiting for verification.'),
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.claims.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final claim = state.claims[index];
-                return ListTile(
-                  leading: const Icon(Icons.local_shipping_outlined),
-                  title: Text('Food: ${claim.foodId}'),
-                  subtitle: Text(
-                    'Donor: ${claim.donorUid}\nReceiver: ${claim.receiverUid}',
-                  ),
-                  isThreeLine: true,
-                  trailing: ElevatedButton(
-                    onPressed: () => context
-                        .read<AdminClaimsBloc>()
-                        .add(VerifyClaimEvent(claim.id)),
-                    child: const Text('Verify'),
-                  ),
-                );
-              },
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
-      ),
+        return const SizedBox.shrink();
+      },
     );
   }
 }
