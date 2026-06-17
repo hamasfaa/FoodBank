@@ -9,6 +9,7 @@ class CreateRatingParams {
   final String receiverId;
   final int score;
   final String comment;
+  final String photoUrl;
 
   const CreateRatingParams({
     required this.claimId,
@@ -16,6 +17,7 @@ class CreateRatingParams {
     required this.receiverId,
     required this.score,
     required this.comment,
+    required this.photoUrl,
   });
 }
 
@@ -31,6 +33,7 @@ class CreateRatingUsecase {
       receiverId: params.receiverId,
       score: params.score,
       comment: params.comment,
+      photoUrl: params.photoUrl,
     );
   }
 }

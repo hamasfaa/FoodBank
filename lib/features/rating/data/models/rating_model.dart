@@ -9,6 +9,8 @@ class RatingModel extends RatingEntity {
     required super.receiverId,
     required super.score,
     required super.comment,
+    required super.photoUrl,
+    required super.isVerifiedByAdmin,
     required super.createdAt,
   });
 
@@ -20,7 +22,9 @@ class RatingModel extends RatingEntity {
       donorId: data['donorId'] as String,
       receiverId: data['receiverId'] as String,
       score: data['score'] as int,
-      comment: data['comment'] as String,
+      comment: data['comment'] as String? ?? '',
+      photoUrl: data['photoUrl'] as String? ?? '',
+      isVerifiedByAdmin: data['isVerifiedByAdmin'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
     );
   }
@@ -31,6 +35,8 @@ class RatingModel extends RatingEntity {
         'receiverId': receiverId,
         'score': score,
         'comment': comment,
+        'photoUrl': photoUrl,
+        'isVerifiedByAdmin': isVerifiedByAdmin,
         'createdAt': Timestamp.fromDate(createdAt),
       };
 }

@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import 'package:foodbank/core/constants/app_colors.dart';
 import 'package:foodbank/features/claim/domain/entities/claim_entity.dart';
 import 'package:foodbank/features/rating/presentation/bloc/rating_bloc.dart';
@@ -34,6 +39,8 @@ class _GiveRatingView extends StatefulWidget {
 class _GiveRatingViewState extends State<_GiveRatingView> {
   int _score = 0;
   final _commentController = TextEditingController();
+  XFile? _proofImage;
+  bool _uploading = false;
 
   @override
   void dispose() {
@@ -41,26 +48,63 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
     super.dispose();
   }
 
-  void _submit() {
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.inter()),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 75,
+      maxWidth: 1080,
+    );
+    if (picked != null) setState(() => _proofImage = picked);
+  }
+
+  Future<String> _uploadProof() async {
+    const uuid = Uuid();
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('ratings/${uuid.v4()}/proof.jpg');
+    await ref.putFile(File(_proofImage!.path));
+    return await ref.getDownloadURL();
+  }
+
+  Future<void> _submit() async {
     if (_score == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Pilih bintang terlebih dahulu', style: GoogleFonts.inter()),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      _showSnack('Pilih bintang terlebih dahulu', isError: true);
+      return;
+    }
+    if (_proofImage == null) {
+      _showSnack('Upload foto bukti pengambilan terlebih dahulu', isError: true);
       return;
     }
 
-    context.read<RatingBloc>().add(SubmitRating(
-          claimId: widget.claim.id,
-          donorId: widget.claim.donorId,
-          receiverId: widget.claim.receiverId,
-          score: _score,
-          comment: _commentController.text.trim(),
-        ));
+    setState(() => _uploading = true);
+    try {
+      final photoUrl = await _uploadProof();
+      if (!mounted) return;
+      context.read<RatingBloc>().add(SubmitRating(
+            claimId: widget.claim.id,
+            donorId: widget.claim.donorId,
+            receiverId: widget.claim.receiverId,
+            score: _score,
+            comment: _commentController.text.trim(),
+            photoUrl: photoUrl,
+          ));
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Gagal mengupload foto bukti', isError: true);
+        setState(() => _uploading = false);
+      }
+    }
   }
 
   @override
@@ -75,7 +119,7 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Beri Rating',
+          'Beri Rating & Bukti',
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -90,34 +134,15 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
       body: BlocListener<RatingBloc, RatingState>(
         listener: (context, state) {
           if (state.status == RatingStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Rating berhasil dikirim!',
-                  style: GoogleFonts.inter(),
-                ),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            );
+            setState(() => _uploading = false);
+            _showSnack('Rating dikirim! Menunggu verifikasi admin.');
             Navigator.of(context).pop();
           }
           if (state.status == RatingStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.errorMessage ?? 'Gagal mengirim rating',
-                  style: GoogleFonts.inter(),
-                ),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+            setState(() => _uploading = false);
+            _showSnack(
+              state.errorMessage ?? 'Gagal mengirim rating',
+              isError: true,
             );
           }
         },
@@ -127,12 +152,15 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildFoodInfo(),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+              _buildProofSection(),
+              const SizedBox(height: 28),
               _buildStarSection(),
               const SizedBox(height: 28),
               _buildCommentSection(),
               const SizedBox(height: 32),
               _buildSubmitButton(),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -200,6 +228,173 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
     );
   }
 
+  Widget _buildProofSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Foto Bukti Pengambilan',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Wajib',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Foto sebagai bukti bahwa kamu sudah mengambil makanan. Akan diverifikasi oleh admin.',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (_proofImage != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              File(_proofImage!.path),
+              width: double.infinity,
+              height: 200,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickImage(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                  label: Text(
+                    'Ambil Ulang',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickImage(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: Text(
+                    'Dari Galeri',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _pickImage(ImageSource.camera),
+                  child: Container(
+                    height: 110,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.camera_alt_outlined,
+                            color: AppColors.primary, size: 32),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Kamera',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _pickImage(ImageSource.gallery),
+                  child: Container(
+                    height: 110,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border, width: 1.5),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.photo_library_outlined,
+                            color: AppColors.textSecondary, size: 32),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Galeri',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildStarSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +423,8 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Icon(
                   star <= _score ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: star <= _score ? const Color(0xFFF59E0B) : AppColors.border,
+                  color:
+                      star <= _score ? const Color(0xFFF59E0B) : AppColors.border,
                   size: 48,
                 ),
               ),
@@ -296,7 +492,7 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
   Widget _buildSubmitButton() {
     return BlocBuilder<RatingBloc, RatingState>(
       builder: (context, state) {
-        final isLoading = state.status == RatingStatus.loading;
+        final isLoading = state.status == RatingStatus.loading || _uploading;
         return SizedBox(
           width: double.infinity,
           height: 52,
@@ -313,7 +509,8 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
                 ? const SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
                   )
                 : Text(
                     'Kirim Rating',

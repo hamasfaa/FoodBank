@@ -10,6 +10,7 @@ abstract class RatingRemoteDatasource {
     required String receiverId,
     required int score,
     required String comment,
+    required String photoUrl,
   });
 }
 
@@ -26,8 +27,8 @@ class RatingRemoteDatasourceImpl implements RatingRemoteDatasource {
     required String receiverId,
     required int score,
     required String comment,
+    required String photoUrl,
   }) async {
-    // Cek apakah sudah pernah rating claim ini
     final existing = await _firestore
         .collection('ratings')
         .where('claimId', isEqualTo: claimId)
@@ -48,6 +49,8 @@ class RatingRemoteDatasourceImpl implements RatingRemoteDatasource {
       receiverId: receiverId,
       score: score,
       comment: comment,
+      photoUrl: photoUrl,
+      isVerifiedByAdmin: false,
       createdAt: now,
     );
 

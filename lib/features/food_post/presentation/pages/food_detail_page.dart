@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -40,6 +41,36 @@ class _FoodDetailView extends StatefulWidget {
 class _FoodDetailViewState extends State<_FoodDetailView> {
   final _pageController = PageController();
   int _currentPage = 0;
+  String? _donorPhone;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDonorPhone();
+  }
+
+  Future<void> _loadDonorPhone() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.post.donorId)
+          .get();
+      if (mounted && doc.exists) {
+        final phone = doc.data()?['phoneNumber'] as String?;
+        if (phone != null && phone.isNotEmpty) {
+          setState(() => _donorPhone = phone);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _callDonor() async {
+    if (_donorPhone == null) return;
+    final uri = Uri.parse('tel:$_donorPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
 
   @override
   void dispose() {
@@ -301,9 +332,27 @@ class _FoodDetailViewState extends State<_FoodDetailView> {
                     color: AppColors.textPrimary,
                   ),
                 ),
+                if (_donorPhone != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _donorPhone!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (_donorPhone != null)
+            IconButton(
+              onPressed: _callDonor,
+              icon: const Icon(Icons.phone_outlined, color: AppColors.primary, size: 22),
+              tooltip: 'Hubungi Donor',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
         ],
       ),
     );

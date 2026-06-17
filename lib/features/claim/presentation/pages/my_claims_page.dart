@@ -290,6 +290,32 @@ class _ClaimCard extends StatefulWidget {
 
 class _ClaimCardState extends State<_ClaimCard> {
   bool _loadingDetail = false;
+  bool _hasRated = false;
+  bool _checkingRating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.claim.status == 'confirmed') {
+      _checkExistingRating();
+    }
+  }
+
+  Future<void> _checkExistingRating() async {
+    setState(() => _checkingRating = true);
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('ratings')
+          .where('claimId', isEqualTo: widget.claim.id)
+          .limit(1)
+          .get();
+      if (mounted) setState(() => _hasRated = query.docs.isNotEmpty);
+    } catch (_) {
+      // diam-diam gagal, tombol tetap ditampilkan
+    } finally {
+      if (mounted) setState(() => _checkingRating = false);
+    }
+  }
 
   Future<void> _openDetail() async {
     if (_loadingDetail) return;
@@ -460,45 +486,10 @@ class _ClaimCardState extends State<_ClaimCard> {
     if (claim.status == 'confirmed') {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _loadingDetail ? null : _openDetail,
-            icon: _loadingDetail
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.location_on_outlined, size: 18),
-            label: Text(
-              'Lihat Detail & Lokasi',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (claim.status == 'verified') {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
+            SizedBox(
+              width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _loadingDetail ? null : _openDetail,
                 icon: _loadingDetail
@@ -510,9 +501,9 @@ class _ClaimCardState extends State<_ClaimCard> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Icon(Icons.info_outline, size: 18),
+                    : const Icon(Icons.location_on_outlined, size: 18),
                 label: Text(
-                  'Detail',
+                  'Lihat Detail & Lokasi',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -527,32 +518,112 @@ class _ClaimCardState extends State<_ClaimCard> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GiveRatingPage(claim: claim),
+            const SizedBox(height: 8),
+            if (_checkingRating)
+              Container(
+                width: double.infinity,
+                height: 42,
+                alignment: Alignment.center,
+                child: const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 2,
                   ),
                 ),
-                icon: const Icon(Icons.star_outline, size: 18),
-                label: Text(
-                  'Beri Rating',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+              )
+            else if (_hasRated)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        size: 16, color: AppColors.success),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Rating sudah dikirim · menunggu verifikasi',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context)
+                      .push(MaterialPageRoute(
+                          builder: (_) => GiveRatingPage(claim: claim)))
+                      .then((_) => _checkExistingRating()),
+                  icon: const Icon(Icons.star_outline, size: 18),
+                  label: Text(
+                    'Beri Rating + Foto Bukti',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
+        ),
+      );
+    }
+
+    if (claim.status == 'verified') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _loadingDetail ? null : _openDetail,
+            icon: _loadingDetail
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.info_outline, size: 18),
+            label: Text(
+              'Detail',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
         ),
       );
     }
