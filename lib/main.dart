@@ -23,6 +23,9 @@ import 'package:foodbank/features/claim/presentation/pages/donor_claims_page.dar
 import 'package:foodbank/features/claim/presentation/pages/my_claims_page.dart';
 import 'package:foodbank/features/profile/presentation/pages/donor_profile_page.dart';
 import 'package:foodbank/features/profile/presentation/pages/receiver_profile_page.dart';
+import 'package:foodbank/admin_claims_page.dart';
+import 'package:foodbank/admin_food_page.dart';
+import 'package:foodbank/admin_dashboard_page.dart';
 
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -111,7 +114,7 @@ class FoodBankApp extends StatelessWidget {
           title: 'FoodBridge',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
-          initialRoute: '/login',
+          initialRoute: '/admin-dashboard',
           routes: {
             '/register': (context) => const RegisterPage(),
             '/complete-profile': (context) => const CompleteProfilePage(),
@@ -123,6 +126,9 @@ class FoodBankApp extends StatelessWidget {
             '/my-claims': (context) => const MyClaimsPage(),
             '/donor-profile': (context) => const DonorProfilePage(),
             '/receiver-profile': (context) => const ReceiverProfilePage(),
+            '/admin-dashboard': (context) => const AdminDashboardPage(),
+            '/admin-food': (context) => const AdminFoodPage(),
+            '/admin-claims': (context) => const AdminClaimsPage(),
           },
         ),
       ),

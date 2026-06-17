@@ -8,21 +8,34 @@ class UserModel {
   final String name;
   final String email;
   final String role;
+  final bool isActive;
 
   const UserModel({
     required this.id,
     required this.name,
     required this.email,
     required this.role,
+    required this.isActive,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       id: doc.id,
-      name: data['name'] ?? '',
+      name: data['displayName'] ?? '',
       email: data['email'] ?? '',
       role: data['role'] ?? 'unknown',
+      isActive: data['isActive'] ?? true,
+    );
+  }
+
+  UserModel copyWith({bool? isActive}) {
+    return UserModel(
+      id: id,
+      name: name,
+      email: email,
+      role: role,
+      isActive: isActive ?? this.isActive,
     );
   }
 }
@@ -30,6 +43,12 @@ class UserModel {
 abstract class AdminUsersEvent {}
 
 class FetchUsersEvent extends AdminUsersEvent {}
+
+class ToggleUserActiveEvent extends AdminUsersEvent {
+  final String userId;
+  final bool newValue;
+  ToggleUserActiveEvent(this.userId, this.newValue);
+}
 
 abstract class AdminUsersState {}
 
@@ -39,7 +58,8 @@ class AdminUsersLoading extends AdminUsersState {}
 
 class AdminUsersLoaded extends AdminUsersState {
   final List<UserModel> users;
-  AdminUsersLoaded(this.users);
+  final String? toggleError;
+  AdminUsersLoaded(this.users, {this.toggleError});
 }
 
 class AdminUsersError extends AdminUsersState {
@@ -52,6 +72,7 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
 
   AdminUsersBloc(this._firestore) : super(AdminUsersInitial()) {
     on<FetchUsersEvent>(_onFetchUsers);
+    on<ToggleUserActiveEvent>(_onToggleUserActive);
   }
 
   Future<void> _onFetchUsers(
@@ -61,11 +82,34 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     emit(AdminUsersLoading());
     try {
       final snapshot = await _firestore.collection('users').get();
-      print('Docs found: ${snapshot.docs.length}');
       final users = snapshot.docs.map(UserModel.fromFirestore).toList();
       emit(AdminUsersLoaded(users));
     } catch (e) {
       emit(AdminUsersError(e.toString()));
+    }
+  }
+
+  Future<void> _onToggleUserActive(
+    ToggleUserActiveEvent event,
+    Emitter<AdminUsersState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! AdminUsersLoaded) return;
+
+    // Optimistic update: reflect the change in UI immediately.
+    final updatedUsers = currentState.users.map((u) {
+      return u.id == event.userId ? u.copyWith(isActive: event.newValue) : u;
+    }).toList();
+    emit(AdminUsersLoaded(updatedUsers));
+
+    try {
+      await _firestore
+          .collection('users')
+          .doc(event.userId)
+          .update({'isActive': event.newValue});
+    } catch (e) {
+      // Roll back to the original list and attach a transient error message.
+      emit(AdminUsersLoaded(currentState.users, toggleError: e.toString()));
     }
   }
 }
@@ -100,7 +144,14 @@ class _AdminUsersView extends StatelessWidget {
           ),
         ],
       ),
-      body: BlocBuilder<AdminUsersBloc, AdminUsersState>(
+      body: BlocConsumer<AdminUsersBloc, AdminUsersState>(
+        listener: (context, state) {
+          if (state is AdminUsersLoaded && state.toggleError != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Update failed: ${state.toggleError}')),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is AdminUsersLoading || state is AdminUsersInitial) {
             return const Center(child: CircularProgressIndicator());
@@ -138,18 +189,34 @@ class _AdminUsersView extends StatelessWidget {
                 final user = state.users[index];
                 return ListTile(
                   leading: CircleAvatar(
+                    backgroundColor:
+                        user.isActive ? null : Colors.grey.shade400,
                     child: Text(
                       user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
                     ),
                   ),
                   title: Text(user.name.isNotEmpty ? user.name : '(no name)'),
                   subtitle: Text(user.email),
-                  trailing: Chip(
-                    label: Text(
-                      user.role,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    padding: EdgeInsets.zero,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Chip(
+                        label: Text(
+                          user.role,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        padding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: user.isActive,
+                        onChanged: (value) {
+                          context
+                              .read<AdminUsersBloc>()
+                              .add(ToggleUserActiveEvent(user.id, value));
+                        },
+                      ),
+                    ],
                   ),
                 );
               },
