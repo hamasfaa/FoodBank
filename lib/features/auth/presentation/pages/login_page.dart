@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage>
         } else if (state.status == AuthStatus.success && state.user != null) {
           final route = switch (state.user!.role) {
             'donor' => '/donor-home',
-            'admin' => '/admin-users',
+            'admin' => '/admin-dashboard',
             'receiver' => '/receiver-home',
             _ => '/login',
           };

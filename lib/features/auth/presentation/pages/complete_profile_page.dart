@@ -110,9 +110,9 @@ class _CompleteProfilePageState extends State<CompleteProfilePage>
         } else if (state.status == AuthStatus.success && state.user != null) {
           final route = switch (state.user!.role) {
             'donor' => '/donor-home',
-            'admin' => '/admin-users',
-            'recipient' => '/receiver-home',
-            _ => '/recipient-home',
+            'admin' => '/admin-dashboard',
+            'receiver' => '/receiver-home',
+            _ => '/login',
           };
           Navigator.pushReplacementNamed(context, route);
         }
