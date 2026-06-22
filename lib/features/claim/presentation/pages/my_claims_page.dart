@@ -432,7 +432,9 @@ class _ClaimCardState extends State<_ClaimCard> {
       if (!mounted) return;
 
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => FoodDetailPage(post: post)),
+        MaterialPageRoute(
+          builder: (_) => FoodDetailPage(post: post, hideClaimButton: true),
+        ),
       );
     } catch (e) {
       if (mounted) _showError('Gagal memuat detail makanan');
@@ -798,7 +800,7 @@ class _ClaimCardState extends State<_ClaimCard> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Rating sudah dikirim · menunggu verifikasi',
+                        'Rating sudah diberikan',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

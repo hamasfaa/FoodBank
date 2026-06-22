@@ -17,22 +17,28 @@ import 'package:foodbank/injection_container.dart';
 
 class FoodDetailPage extends StatelessWidget {
   final FoodPostEntity post;
+  final bool hideClaimButton;
 
-  const FoodDetailPage({super.key, required this.post});
+  const FoodDetailPage({
+    super.key,
+    required this.post,
+    this.hideClaimButton = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => sl<ClaimBloc>(),
-      child: _FoodDetailView(post: post),
+      child: _FoodDetailView(post: post, hideClaimButton: hideClaimButton),
     );
   }
 }
 
 class _FoodDetailView extends StatefulWidget {
   final FoodPostEntity post;
+  final bool hideClaimButton;
 
-  const _FoodDetailView({required this.post});
+  const _FoodDetailView({required this.post, required this.hideClaimButton});
 
   @override
   State<_FoodDetailView> createState() => _FoodDetailViewState();
@@ -443,6 +449,7 @@ class _FoodDetailViewState extends State<_FoodDetailView> {
   }
 
   Widget _buildClaimButton(BuildContext context, UserEntity? user) {
+    if (widget.hideClaimButton) return const SizedBox.shrink();
     return BlocBuilder<ClaimBloc, ClaimState>(
       builder: (context, state) {
         final isLoading = state.status == ClaimStatus.loading;
