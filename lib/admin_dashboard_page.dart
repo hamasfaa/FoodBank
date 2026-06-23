@@ -51,10 +51,10 @@ class AdminStatsBloc extends Bloc<AdminStatsEvent, AdminStatsState> {
           (await _firestore.collection('users').count().get()).count ?? 0;
       final postsCount =
           (await _firestore.collection('food_posts').count().get()).count ??
-              0;
+          0;
       final pendingClaimsCount = (await _firestore
                   .collection('claims')
-                  .where('status', isEqualTo: 'PENDING')
+                  .where('status', isEqualTo: 'pending')
                   .count()
                   .get())
               .count ??
@@ -369,7 +369,7 @@ class _RatingsTab extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: state.ratings.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final rating = state.ratings[index];
               return ListTile(

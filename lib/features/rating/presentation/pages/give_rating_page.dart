@@ -53,18 +53,28 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
   }
 
   void _submit() {
+    if (widget.claim.status != 'verified' || !widget.claim.isVerifiedByAdmin) {
+      _showSnack(
+        'Rating hanya bisa diberikan setelah bukti diverifikasi admin',
+        isError: true,
+      );
+      return;
+    }
+
     if (_score == 0) {
       _showSnack('Pilih bintang terlebih dahulu', isError: true);
       return;
     }
 
-    context.read<RatingBloc>().add(SubmitRating(
-          claimId: widget.claim.id,
-          donorId: widget.claim.donorId,
-          receiverId: widget.claim.receiverId,
-          score: _score,
-          comment: _commentController.text.trim(),
-        ));
+    context.read<RatingBloc>().add(
+      SubmitRating(
+        claimId: widget.claim.id,
+        donorId: widget.claim.donorId,
+        receiverId: widget.claim.receiverId,
+        score: _score,
+        comment: _commentController.text.trim(),
+      ),
+    );
   }
 
   @override
@@ -180,7 +190,10 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
       width: 60,
       height: 60,
       color: AppColors.border,
-      child: const Icon(Icons.fastfood_outlined, color: AppColors.textSecondary),
+      child: const Icon(
+        Icons.fastfood_outlined,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 
@@ -199,7 +212,10 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
         const SizedBox(height: 4),
         Text(
           'Seberapa puas kamu dengan donasi ini?',
-          style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary),
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 16),
         Row(
@@ -211,8 +227,12 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Icon(
-                  star <= _score ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: star <= _score ? const Color(0xFFF59E0B) : AppColors.border,
+                  star <= _score
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                  color: star <= _score
+                      ? const Color(0xFFF59E0B)
+                      : AppColors.border,
                   size: 48,
                 ),
               ),
@@ -224,10 +244,19 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
           child: Text(
             _score == 0
                 ? 'Belum dipilih'
-                : ['', 'Sangat Buruk', 'Buruk', 'Cukup', 'Baik', 'Sangat Baik'][_score],
+                : [
+                    '',
+                    'Sangat Buruk',
+                    'Buruk',
+                    'Cukup',
+                    'Baik',
+                    'Sangat Baik',
+                  ][_score],
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: _score == 0 ? AppColors.textSecondary : const Color(0xFFF59E0B),
+              color: _score == 0
+                  ? AppColors.textSecondary
+                  : const Color(0xFFF59E0B),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -298,7 +327,9 @@ class _GiveRatingViewState extends State<_GiveRatingView> {
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2),
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
                 : Text(
                     'Kirim Rating',

@@ -63,8 +63,7 @@ class _MyClaimsViewState extends State<_MyClaimsView> {
         content: Text(message, style: GoogleFonts.inter()),
         backgroundColor: isError ? AppColors.error : AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -124,11 +123,10 @@ class _MyClaimsViewState extends State<_MyClaimsView> {
                       : RefreshIndicator(
                           color: AppColors.primary,
                           onRefresh: () async {
-                            final user =
-                                context.read<AuthBloc>().state.user;
-                            context
-                                .read<ClaimBloc>()
-                                .add(LoadMyClaims(user?.uid ?? ''));
+                            final user = context.read<AuthBloc>().state.user;
+                            context.read<ClaimBloc>().add(
+                              LoadMyClaims(user?.uid ?? ''),
+                            );
                           },
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
@@ -191,7 +189,9 @@ class _MyClaimsViewState extends State<_MyClaimsView> {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: selected ? Colors.white : AppColors.textPrimary,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -334,18 +334,34 @@ class _ClaimCardState extends State<_ClaimCard> {
     setState(() => _uploadingProof = true);
     try {
       const uuid = Uuid();
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('claims/${widget.claim.id}/${uuid.v4()}_proof.jpg');
+      final ref = FirebaseStorage.instance.ref().child(
+        'claims/${widget.claim.id}/${uuid.v4()}_proof.jpg',
+      );
       await ref.putFile(File(picked.path));
       final photoUrl = await ref.getDownloadURL();
 
       await FirebaseFirestore.instance
           .collection('claims')
           .doc(widget.claim.id)
-          .update({'proofPhotoUrl': photoUrl});
+          .update({
+            'proofPhotoUrl': photoUrl,
+            'proofUploadedAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Foto bukti berhasil dikirim',
+              style: GoogleFonts.inter(),
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
         final user = context.read<AuthBloc>().state.user;
         context.read<ClaimBloc>().add(LoadMyClaims(user?.uid ?? ''));
       }
@@ -387,8 +403,10 @@ class _ClaimCardState extends State<_ClaimCard> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(Icons.camera_alt_outlined,
-                    color: AppColors.primary),
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: AppColors.primary,
+                ),
                 title: Text('Kamera', style: GoogleFonts.inter()),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -396,8 +414,10 @@ class _ClaimCardState extends State<_ClaimCard> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_outlined,
-                    color: AppColors.textSecondary),
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: AppColors.textSecondary,
+                ),
                 title: Text('Galeri', style: GoogleFonts.inter()),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -519,8 +539,9 @@ class _ClaimCardState extends State<_ClaimCard> {
                       const SizedBox(height: 4),
                       _InfoLine(
                         icon: Icons.schedule_outlined,
-                        text: DateFormat('dd MMM yyyy, HH:mm')
-                            .format(claim.claimedAt),
+                        text: DateFormat(
+                          'dd MMM yyyy, HH:mm',
+                        ).format(claim.claimedAt),
                       ),
                       if (claim.confirmedAt != null) ...[
                         const SizedBox(height: 4),
@@ -547,7 +568,10 @@ class _ClaimCardState extends State<_ClaimCard> {
       width: 82,
       height: 82,
       color: AppColors.border,
-      child: const Icon(Icons.fastfood_outlined, color: AppColors.textSecondary),
+      child: const Icon(
+        Icons.fastfood_outlined,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 
@@ -615,29 +639,36 @@ class _ClaimCardState extends State<_ClaimCard> {
     }
 
     if (claim.status == 'confirmed') {
-      final hasProof = claim.proofPhotoUrl != null &&
-          claim.proofPhotoUrl!.isNotEmpty;
+      final hasProof =
+          claim.proofPhotoUrl != null && claim.proofPhotoUrl!.isNotEmpty;
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: hasProof
             ? Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 14,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.hourglass_top_outlined,
-                        size: 15, color: Color(0xFFF59E0B)),
+                    const Icon(
+                      Icons.hourglass_top_outlined,
+                      size: 15,
+                      color: Color(0xFFF59E0B),
+                    ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Foto bukti dikirim · menunggu verifikasi admin',
+                        'Foto bukti dikirim - menunggu verifikasi admin',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -660,19 +691,24 @@ class _ClaimCardState extends State<_ClaimCard> {
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
-                                  color: AppColors.primary, strokeWidth: 2),
+                                color: AppColors.primary,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Icon(Icons.location_on_outlined, size: 18),
                       label: Text(
                         'Lihat Detail & Lokasi',
                         style: GoogleFonts.poppins(
-                            fontSize: 13, fontWeight: FontWeight.w600),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -680,25 +716,32 @@ class _ClaimCardState extends State<_ClaimCard> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _uploadingProof ? null : _showProofSourcePicker,
+                      onPressed: _uploadingProof
+                          ? null
+                          : _showProofSourcePicker,
                       icon: _uploadingProof
                           ? const SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2),
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Icon(Icons.camera_alt_outlined, size: 18),
                       label: Text(
                         'Upload Foto Bukti Pengambilan',
                         style: GoogleFonts.poppins(
-                            fontSize: 13, fontWeight: FontWeight.w600),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -750,9 +793,13 @@ class _ClaimCardState extends State<_ClaimCard> {
                       onPressed: _checkingRating
                           ? null
                           : () => Navigator.of(context)
-                              .push(MaterialPageRoute(
-                                  builder: (_) => GiveRatingPage(claim: claim)))
-                              .then((_) => _checkExistingRating()),
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        GiveRatingPage(claim: claim),
+                                  ),
+                                )
+                                .then((_) => _checkExistingRating()),
                       icon: _checkingRating
                           ? const SizedBox(
                               width: 16,
@@ -786,17 +833,25 @@ class _ClaimCardState extends State<_ClaimCard> {
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle_outline,
-                        size: 16, color: AppColors.success),
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 16,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
