@@ -32,25 +32,29 @@ class ClaimModel {
     required this.receiverName,
     required this.status,
     required this.isVerifiedByAdmin,
-    required this.claimedAt,
-    required this.confirmedAt,
+    this.claimedAt,
+    this.confirmedAt,
   });
 
   factory ClaimModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return ClaimModel(
       id: doc.id,
-      foodId: data['foodId'] ?? '',
-      foodTitle: data['foodTitle'] ?? '',
-      foodImageUrl: data['foodImageUrl'] ?? '',
-      donorId: data['donorId'] ?? '',
-      donorName: data['donorName'] ?? '',
-      receiverId: data['receiverId'] ?? '',
-      receiverName: data['receiverName'] ?? '',
-      status: data['status'] ?? 'unknown',
-      isVerifiedByAdmin: data['isVerifiedByAdmin'] ?? false,
-      claimedAt: (data['claimedAt'] as Timestamp?)?.toDate(),
-      confirmedAt: (data['confirmedAt'] as Timestamp?)?.toDate(),
+      foodId: data['foodId'] as String? ?? '',
+      foodTitle: data['foodTitle'] as String? ?? '',
+      foodImageUrl: data['foodImageUrl'] as String? ?? '',
+      donorId: data['donorId'] as String? ?? '',
+      donorName: data['donorName'] as String? ?? '',
+      receiverId: data['receiverId'] as String? ?? '',
+      receiverName: data['receiverName'] as String? ?? '',
+      status: data['status'] as String? ?? 'unknown',
+      isVerifiedByAdmin: data['isVerifiedByAdmin'] as bool? ?? false,
+      claimedAt: data['claimedAt'] != null
+          ? (data['claimedAt'] as Timestamp).toDate()
+          : null,
+      confirmedAt: data['confirmedAt'] != null
+          ? (data['confirmedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -211,7 +215,7 @@ class AdminClaimsPage extends StatelessWidget {
   }
 }
 
-class _AdminClaimsListView extends StatefulWidget {
+class _AdminClaimsListView extends StatelessWidget {
   final String status;
   final String emptyMessage;
   final bool showVerifyButton;
@@ -223,17 +227,7 @@ class _AdminClaimsListView extends StatefulWidget {
   });
 
   @override
-  State<_AdminClaimsListView> createState() => _AdminClaimsListViewState();
-}
-
-class _AdminClaimsListViewState extends State<_AdminClaimsListView>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
   Widget build(BuildContext context) {
-    super.build(context); // required by AutomaticKeepAliveClientMixin
     return BlocConsumer<AdminClaimsBloc, AdminClaimsState>(
       listener: (context, state) {
         if (state is AdminClaimsLoaded && state.actionError != null) {
@@ -248,22 +242,33 @@ class _AdminClaimsListViewState extends State<_AdminClaimsListView>
         }
 
         if (state is AdminClaimsError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 12),
-                Text(state.message, textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: () => context
-                      .read<AdminClaimsBloc>()
-                      .add(FetchClaimsByStatusEvent(widget.status)),
-                  child: const Text('Retry'),
+          return ListView(
+            children: [
+              SizedBox(
+                height: 300,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.red),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(state.message, textAlign: TextAlign.center),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () => context
+                            .read<AdminClaimsBloc>()
+                            .add(FetchClaimsByStatusEvent(status)),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         }
 
@@ -271,13 +276,13 @@ class _AdminClaimsListViewState extends State<_AdminClaimsListView>
           return RefreshIndicator(
             onRefresh: () async => context
                 .read<AdminClaimsBloc>()
-                .add(FetchClaimsByStatusEvent(widget.status)),
+                .add(FetchClaimsByStatusEvent(status)),
             child: state.claims.isEmpty
                 ? ListView(
                     children: [
                       SizedBox(
                         height: 300,
-                        child: Center(child: Text(widget.emptyMessage)),
+                        child: Center(child: Text(emptyMessage)),
                       ),
                     ],
                   )
@@ -287,30 +292,63 @@ class _AdminClaimsListViewState extends State<_AdminClaimsListView>
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final claim = state.claims[index];
-                      return ListTile(
-                        leading: claim.foodImageUrl.isNotEmpty
-                            ? CircleAvatar(
-                                backgroundImage:
-                                    NetworkImage(claim.foodImageUrl),
-                              )
-                            : const Icon(Icons.local_shipping_outlined),
-                        title: Text(
-                          claim.foodTitle.isNotEmpty
-                              ? claim.foodTitle
-                              : '(food: ${claim.foodId})',
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              claim.foodImageUrl.isNotEmpty
+                                  ? CircleAvatar(
+                                      backgroundImage:
+                                          NetworkImage(claim.foodImageUrl),
+                                    )
+                                  : const CircleAvatar(
+                                      child:
+                                          Icon(Icons.local_shipping_outlined),
+                                    ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      claim.foodTitle.isNotEmpty
+                                          ? claim.foodTitle
+                                          : '(food: ${claim.foodId})',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Donor: ${claim.donorName}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      'Receiver: ${claim.receiverName}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (showVerifyButton) ...[
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 80,
+                                  child: ElevatedButton(
+                                    onPressed: () => context
+                                        .read<AdminClaimsBloc>()
+                                        .add(VerifyClaimEvent(claim.id)),
+                                    child: const Text('Verify',
+                                        style: TextStyle(fontSize: 12)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                        subtitle: Text(
-                          'Donor: ${claim.donorName}\nReceiver: ${claim.receiverName}',
-                        ),
-                        isThreeLine: true,
-                        trailing: widget.showVerifyButton
-                            ? ElevatedButton(
-                                onPressed: () => context
-                                    .read<AdminClaimsBloc>()
-                                    .add(VerifyClaimEvent(claim.id)),
-                                child: const Text('Verify'),
-                              )
-                            : null,
                       );
                     },
                   ),
