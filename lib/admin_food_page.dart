@@ -239,39 +239,63 @@ class _AdminFoodView extends StatelessWidget {
                 final food = state.foods[index];
                 final canClose =
                     food.status == 'available' || food.status == 'claimed';
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: food.imageUrls.isNotEmpty
-                        ? NetworkImage(food.imageUrls.first)
-                        : null,
-                    child: food.imageUrls.isEmpty
-                        ? const Icon(Icons.restaurant)
-                        : null,
-                  ),
-                  title: Text(food.title.isNotEmpty ? food.title : '(no title)'),
-                  subtitle: Text(
-                    'Qty: ${food.quantity.toStringAsFixed(0)}g · Donor: ${food.donorName.isNotEmpty ? food.donorName : food.donorId}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Chip(
-                        label: Text(
-                          food.status,
-                          style: const TextStyle(fontSize: 11, color: Colors.white),
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundImage: food.imageUrls.isNotEmpty
+                              ? NetworkImage(food.imageUrls.first)
+                              : null,
+                          child: food.imageUrls.isEmpty
+                              ? const Icon(Icons.restaurant)
+                              : null,
                         ),
-                        backgroundColor: _statusColor(food.status),
-                        padding: EdgeInsets.zero,
-                      ),
-                      const SizedBox(width: 8),
-                      if (canClose)
-                        TextButton(
-                          onPressed: () => context
-                              .read<AdminFoodBloc>()
-                              .add(CloseFoodEvent(food.id)),
-                          child: const Text('Close'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                food.title.isNotEmpty
+                                    ? food.title
+                                    : '(no title)',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Qty: ${food.quantity.toStringAsFixed(0)}g · ${food.donorName.isNotEmpty ? food.donorName : food.donorId}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
                         ),
-                    ],
+                        const SizedBox(width: 8),
+                        Chip(
+                          label: Text(
+                            food.status,
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.white),
+                          ),
+                          backgroundColor: _statusColor(food.status),
+                          padding: EdgeInsets.zero,
+                        ),
+                        if (canClose) ...[
+                          const SizedBox(width: 4),
+                          TextButton(
+                            onPressed: () => context
+                                .read<AdminFoodBloc>()
+                                .add(CloseFoodEvent(food.id)),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 );
               },
