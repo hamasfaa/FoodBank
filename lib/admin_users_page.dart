@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:foodbank/core/widgets/admin_logout_button.dart';
 import 'package:foodbank/injection_container.dart';
 
 class UserModel {
@@ -142,6 +143,7 @@ class _AdminUsersView extends StatelessWidget {
             onPressed: () =>
                 context.read<AdminUsersBloc>().add(FetchUsersEvent()),
           ),
+          const AdminLogoutButton(),
         ],
       ),
       body: BlocConsumer<AdminUsersBloc, AdminUsersState>(

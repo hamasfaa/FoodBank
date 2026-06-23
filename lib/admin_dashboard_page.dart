@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:foodbank/core/widgets/admin_logout_button.dart';
 import 'package:foodbank/injection_container.dart';
 
 // ─────────────────────────────────────────────
@@ -188,6 +189,7 @@ class _AdminDashboardView extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Dashboard'),
+          actions: const [AdminLogoutButton()],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Overview'),

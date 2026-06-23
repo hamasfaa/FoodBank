@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:foodbank/core/widgets/admin_logout_button.dart';
 import 'package:foodbank/injection_container.dart';
 
 // ─────────────────────────────────────────────
@@ -193,6 +194,7 @@ class _AdminFoodView extends StatelessWidget {
             onPressed: () =>
                 context.read<AdminFoodBloc>().add(FetchFoodsEvent()),
           ),
+          const AdminLogoutButton(),
         ],
       ),
       body: BlocConsumer<AdminFoodBloc, AdminFoodState>(
