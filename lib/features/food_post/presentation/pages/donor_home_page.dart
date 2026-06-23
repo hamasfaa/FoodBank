@@ -12,6 +12,7 @@ import 'package:foodbank/features/food_post/presentation/bloc/food_post_state.da
 import 'package:foodbank/injection_container.dart';
 import 'create_food_post_page.dart';
 import 'edit_food_post_page.dart';
+import 'food_detail_page.dart';
 
 enum _DonorPostFilter { all, available, claimed, closed, expired }
 
@@ -163,6 +164,7 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
                               final post = posts[i];
                               return _FoodPostCard(
                                 post: post,
+                                onView: () => _openPostDetail(context, post),
                                 onEdit: () => _openEditPost(context, post),
                                 onClose: () => _confirmClosePost(context, post),
                               );
@@ -483,6 +485,17 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
     };
   }
 
+  Future<void> _openPostDetail(
+    BuildContext context,
+    FoodPostEntity post,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FoodDetailPage(post: post, hideClaimButton: true),
+      ),
+    );
+  }
+
   Future<void> _openEditPost(BuildContext context, FoodPostEntity post) async {
     if (post.status != 'available') {
       _showActionError(context, 'Hanya postingan tersedia yang bisa diedit');
@@ -716,11 +729,13 @@ class _DonorHomeViewState extends State<_DonorHomeView> {
 
 class _FoodPostCard extends StatelessWidget {
   final FoodPostEntity post;
+  final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onClose;
 
   const _FoodPostCard({
     required this.post,
+    required this.onView,
     required this.onEdit,
     required this.onClose,
   });
@@ -739,92 +754,100 @@ class _FoodPostCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-            ),
-            child: Image.network(
-              post.imageUrls.isNotEmpty ? post.imageUrls.first : '',
-              width: 110,
-              height: 120,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 110,
-                height: 120,
-                color: AppColors.border,
-                child: const Icon(
-                  Icons.broken_image_outlined,
-                  color: AppColors.textSecondary,
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onView,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+                child: Image.network(
+                  post.imageUrls.isNotEmpty ? post.imageUrls.first : '',
+                  width: 110,
+                  height: 120,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    width: 110,
+                    height: 120,
+                    color: AppColors.border,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          post.title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              post.title,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          const SizedBox(width: 6),
+                          _StatusBadge(status: post.status),
+                          _PostActionMenu(
+                            post: post,
+                            onEdit: onEdit,
+                            onClose: onClose,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      _StatusBadge(status: post.status),
-                      _PostActionMenu(
-                        post: post,
-                        onEdit: onEdit,
-                        onClose: onClose,
+                      const SizedBox(height: 4),
+                      Text(
+                        post.description,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      _InfoRow(
+                        icon: Icons.scale_outlined,
+                        text: '${post.quantity.toStringAsFixed(0)} g',
+                      ),
+                      const SizedBox(height: 3),
+                      _InfoRow(
+                        icon: Icons.schedule_outlined,
+                        text:
+                            'Exp: ${DateFormat('dd MMM yyyy').format(post.expiredAt)}',
+                      ),
+                      const SizedBox(height: 3),
+                      _InfoRow(
+                        icon: Icons.location_on_outlined,
+                        text: post.location.address,
+                        maxLines: 1,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    post.description,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  _InfoRow(
-                    icon: Icons.scale_outlined,
-                    text: '${post.quantity.toStringAsFixed(0)} g',
-                  ),
-                  const SizedBox(height: 3),
-                  _InfoRow(
-                    icon: Icons.schedule_outlined,
-                    text:
-                        'Exp: ${DateFormat('dd MMM yyyy').format(post.expiredAt)}',
-                  ),
-                  const SizedBox(height: 3),
-                  _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    text: post.location.address,
-                    maxLines: 1,
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
